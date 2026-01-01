@@ -21,33 +21,14 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run library tests");
     test_step.dependOn(&run_lib_tests.step);
 
-    // Example: Hello World
-    const hello_example = b.addExecutable(.{
-        .name = "hello",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/hello.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "zigtui", .module = zigtui_module },
-            },
-        }),
-    });
-    const install_hello = b.addInstallArtifact(hello_example, .{});
+    // Examples step
     const examples_step = b.step("examples", "Build example applications");
-    examples_step.dependOn(&install_hello.step);
 
-    // Run hello example
-    const run_hello = b.addRunArtifact(hello_example);
-    run_hello.step.dependOn(&install_hello.step);
-    const run_hello_step = b.step("run-hello", "Run hello example");
-    run_hello_step.dependOn(&run_hello.step);
-
-    // Example: Widget Showcase
-    const showcase_example = b.addExecutable(.{
-        .name = "showcase",
+    // Example: Dashboard (System Monitor)
+    const dashboard_example = b.addExecutable(.{
+        .name = "dashboard",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/showcase.zig"),
+            .root_source_file = b.path("examples/dashboard.zig"),
             .target = target,
             .optimize = optimize,
             .imports = &.{
@@ -55,13 +36,12 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    showcase_example.linkLibC();
-    const install_showcase = b.addInstallArtifact(showcase_example, .{});
-    examples_step.dependOn(&install_showcase.step);
+    const install_dashboard = b.addInstallArtifact(dashboard_example, .{});
+    examples_step.dependOn(&install_dashboard.step);
 
-    // Run showcase example
-    const run_showcase = b.addRunArtifact(showcase_example);
-    run_showcase.step.dependOn(&install_showcase.step);
-    const run_showcase_step = b.step("run-showcase", "Run widget showcase example");
-    run_showcase_step.dependOn(&run_showcase.step);
+    // Run dashboard example
+    const run_dashboard = b.addRunArtifact(dashboard_example);
+    run_dashboard.step.dependOn(&install_dashboard.step);
+    const run_dashboard_step = b.step("run-dashboard", "Run system monitor dashboard");
+    run_dashboard_step.dependOn(&run_dashboard.step);
 }

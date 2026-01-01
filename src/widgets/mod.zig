@@ -162,36 +162,49 @@ pub const BorderSymbols = struct {
     horizontal: u21,
     vertical: u21,
 
+    /// ASCII borders - works on all terminals including Windows
     pub fn default() BorderSymbols {
         return .{
-            .top_left = '┌',
-            .top_right = '┐',
-            .bottom_left = '└',
-            .bottom_right = '┘',
-            .horizontal = '─',
-            .vertical = '│',
+            .top_left = '+',
+            .top_right = '+',
+            .bottom_left = '+',
+            .bottom_right = '+',
+            .horizontal = '-',
+            .vertical = '|',
+        };
+    }
+
+    /// Unicode line drawing borders
+    pub fn line() BorderSymbols {
+        return .{
+            .top_left = 0x250C, // ┌
+            .top_right = 0x2510, // ┐
+            .bottom_left = 0x2514, // └
+            .bottom_right = 0x2518, // ┘
+            .horizontal = 0x2500, // ─
+            .vertical = 0x2502, // │
         };
     }
 
     pub fn rounded() BorderSymbols {
         return .{
-            .top_left = '╭',
-            .top_right = '╮',
-            .bottom_left = '╰',
-            .bottom_right = '╯',
-            .horizontal = '─',
-            .vertical = '│',
+            .top_left = 0x256D, // ╭
+            .top_right = 0x256E, // ╮
+            .bottom_left = 0x2570, // ╰
+            .bottom_right = 0x256F, // ╯
+            .horizontal = 0x2500, // ─
+            .vertical = 0x2502, // │
         };
     }
 
     pub fn double() BorderSymbols {
         return .{
-            .top_left = '╔',
-            .top_right = '╗',
-            .bottom_left = '╚',
-            .bottom_right = '╝',
-            .horizontal = '═',
-            .vertical = '║',
+            .top_left = 0x2554, // ╔
+            .top_right = 0x2557, // ╗
+            .bottom_left = 0x255A, // ╚
+            .bottom_right = 0x255D, // ╝
+            .horizontal = 0x2550, // ═
+            .vertical = 0x2551, // ║
         };
     }
 };

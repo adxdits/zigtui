@@ -58,7 +58,7 @@ pub const Terminal = struct {
 
     /// Draw frame using render function
     pub fn draw(self: *Terminal, ctx: anytype, renderFn: fn (@TypeOf(ctx), *Buffer) anyerror!void) !void {
-        // Clear next buffer
+        // Clear the buffer
         self.next_buffer.clear();
 
         // Call user render function
@@ -70,49 +70,92 @@ pub const Terminal = struct {
 
     /// Flush buffered changes to terminal
     pub fn flush(self: *Terminal) !void {
-        // Calculate diff
-        var diff = try self.current_buffer.diff(self.next_buffer, self.current_buffer.allocator);
-        defer diff.deinit();
-
-        // Write changes
-        var output: std.ArrayListUnmanaged(u8) = .empty;
-        defer output.deinit(self.current_buffer.allocator);
         const alloc = self.current_buffer.allocator;
 
-        for (diff.updates.items) |update| {
-            // Move cursor
-            try output.print(alloc, "\x1b[{d};{d}H", .{ update.y + 1, update.x + 1 });
+        // Build output buffer
+        var output: std.ArrayListUnmanaged(u8) = .empty;
+        defer output.deinit(alloc);
 
-            // Apply style
-            const cell = update.cell;
-            if (cell.fg != .reset) {
-                if (cell.fg == .rgb) {
-                    const rgb = cell.fg.rgb;
-                    try output.print(alloc, "\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
+        // Move cursor to home position first
+        try output.appendSlice(alloc, "\x1b[H");
+
+        var last_fg: style.Color = .reset;
+        var last_bg: style.Color = .reset;
+        var last_modifier: style.Modifier = .{};
+
+        var y: u16 = 0;
+        while (y < self.next_buffer.height) : (y += 1) {
+            // Move to start of line
+            var cursor_buf: [16]u8 = undefined;
+            const cursor_cmd = std.fmt.bufPrint(&cursor_buf, "\x1b[{d};1H", .{y + 1}) catch continue;
+            try output.appendSlice(alloc, cursor_cmd);
+
+            var x: u16 = 0;
+            while (x < self.next_buffer.width) : (x += 1) {
+                const cell = self.next_buffer.get(x, y) orelse continue;
+
+                // Check if style changed
+                const fg_changed = !cell.fg.eql(last_fg);
+                const bg_changed = !cell.bg.eql(last_bg);
+                const mod_changed = !cell.modifier.eql(last_modifier);
+
+                if (fg_changed or bg_changed or mod_changed) {
+                    // Reset and apply new style
+                    try output.appendSlice(alloc, "\x1b[0m");
+
+                    // Apply foreground
+                    if (cell.fg != .reset) {
+                        if (cell.fg == .rgb) {
+                            const rgb = cell.fg.rgb;
+                            var fg_buf: [24]u8 = undefined;
+                            const fg_cmd = std.fmt.bufPrint(&fg_buf, "\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b }) catch continue;
+                            try output.appendSlice(alloc, fg_cmd);
+                        } else {
+                            try output.appendSlice(alloc, cell.fg.toFg());
+                        }
+                    }
+
+                    // Apply background
+                    if (cell.bg != .reset) {
+                        if (cell.bg == .rgb) {
+                            const rgb = cell.bg.rgb;
+                            var bg_buf: [24]u8 = undefined;
+                            const bg_cmd = std.fmt.bufPrint(&bg_buf, "\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b }) catch continue;
+                            try output.appendSlice(alloc, bg_cmd);
+                        } else {
+                            try output.appendSlice(alloc, cell.bg.toBg());
+                        }
+                    }
+
+                    // Apply modifiers
+                    if (cell.modifier.bold) try output.appendSlice(alloc, "\x1b[1m");
+                    if (cell.modifier.italic) try output.appendSlice(alloc, "\x1b[3m");
+                    if (cell.modifier.underlined) try output.appendSlice(alloc, "\x1b[4m");
+                    if (cell.modifier.reversed) try output.appendSlice(alloc, "\x1b[7m");
+
+                    last_fg = cell.fg;
+                    last_bg = cell.bg;
+                    last_modifier = cell.modifier;
+                }
+
+                // Write character (ASCII only for Windows compatibility)
+                if (cell.char < 128) {
+                    const byte: u8 = @intCast(cell.char);
+                    try output.append(alloc, byte);
                 } else {
-                    try output.appendSlice(alloc, cell.fg.toFg());
+                    // For Unicode, encode as UTF-8
+                    var char_buf: [4]u8 = undefined;
+                    const len = std.unicode.utf8Encode(cell.char, &char_buf) catch {
+                        try output.append(alloc, '?');
+                        continue;
+                    };
+                    try output.appendSlice(alloc, char_buf[0..len]);
                 }
             }
-            if (cell.bg != .reset) {
-                if (cell.bg == .rgb) {
-                    const rgb = cell.bg.rgb;
-                    try output.print(alloc, "\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b });
-                } else {
-                    try output.appendSlice(alloc, cell.bg.toBg());
-                }
-            }
-
-            // Write modifiers (simplified - skip for now as toAnsi expects a writer)
-            // TODO: Update modifier.toAnsi to work with ArrayListUnmanaged
-
-            // Write character
-            var buf: [4]u8 = undefined;
-            const len = std.unicode.utf8Encode(cell.char, &buf) catch continue;
-            try output.appendSlice(alloc, buf[0..len]);
-
-            // Reset style
-            try output.appendSlice(alloc, "\x1b[0m");
         }
+
+        // Reset style at end
+        try output.appendSlice(alloc, "\x1b[0m");
 
         // Write to backend
         if (output.items.len > 0) {
@@ -120,8 +163,8 @@ pub const Terminal = struct {
             try self.backend_impl.flush();
         }
 
-        // Swap buffers
-        std.mem.swap(Buffer, &self.current_buffer, &self.next_buffer);
+        // Copy next buffer to current for next frame comparison
+        @memcpy(self.current_buffer.cells, self.next_buffer.cells);
     }
 
     /// Clear terminal

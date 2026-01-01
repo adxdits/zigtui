@@ -9,12 +9,19 @@ const render = @import("../render/mod.zig");
 const Allocator = std.mem.Allocator;
 
 const is_windows = builtin.os.tag == .windows;
+const is_linux = builtin.os.tag == .linux;
+const is_macos = builtin.os.tag == .macos;
+const is_posix = !is_windows;
+
+// POSIX types - only available on non-Windows
+const posix = if (is_posix) std.posix else void;
+const termios = if (is_posix) std.posix.termios else void;
 
 pub const AnsiBackend = struct {
     allocator: Allocator,
     stdin: std.fs.File,
     stdout: std.fs.File,
-    original_termios: if (!is_windows) std.posix.termios else void,
+    original_termios: if (is_posix) std.posix.termios else void,
     in_raw_mode: bool = false,
     in_alternate_screen: bool = false,
     write_buffer: std.ArrayListUnmanaged(u8) = .empty,
@@ -24,11 +31,11 @@ pub const AnsiBackend = struct {
             return error.UnsupportedTerminal; // Use windows.zig backend instead
         }
 
-        const stdin = std.fs.File.stdin();
-        const stdout = std.fs.File.stdout();
+        const stdin = std.io.getStdIn();
+        const stdout = std.io.getStdOut();
 
         // Save original terminal settings
-        const original = try std.posix.tcgetattr(stdin.handle);
+        const original = if (is_posix) try posix.tcgetattr(stdin.handle) else {};
 
         return AnsiBackend{
             .allocator = allocator,
@@ -72,7 +79,7 @@ pub const AnsiBackend = struct {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (self.in_raw_mode) return;
 
-        if (!is_windows) {
+        if (is_posix) {
             var raw = self.original_termios;
 
             // Disable canonical mode and echo
@@ -95,10 +102,10 @@ pub const AnsiBackend = struct {
             raw.cflag.CSIZE = .CS8;
 
             // Set read timeout
-            raw.cc[@intFromEnum(std.posix.V.TIME)] = 0;
-            raw.cc[@intFromEnum(std.posix.V.MIN)] = 0;
+            raw.cc[@intFromEnum(posix.V.TIME)] = 0;
+            raw.cc[@intFromEnum(posix.V.MIN)] = 0;
 
-            try std.posix.tcsetattr(self.stdin.handle, .FLUSH, raw);
+            posix.tcsetattr(self.stdin.handle, .FLUSH, raw) catch return Error.IOError;
             self.in_raw_mode = true;
         }
     }
@@ -107,8 +114,8 @@ pub const AnsiBackend = struct {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (!self.in_raw_mode) return;
 
-        if (!is_windows) {
-            try std.posix.tcsetattr(self.stdin.handle, .FLUSH, self.original_termios);
+        if (is_posix) {
+            posix.tcsetattr(self.stdin.handle, .FLUSH, self.original_termios) catch return Error.IOError;
         }
         self.in_raw_mode = false;
     }
@@ -151,16 +158,19 @@ pub const AnsiBackend = struct {
 
     fn getSize(ptr: *anyopaque) Error!render.Size {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
-        if (builtin.os.tag == .windows) {
+
+        if (is_windows) {
             // Windows: fallback to default size
             return .{ .width = 80, .height = 24 };
-        } else {
-            var size: std.posix.winsize = undefined;
-            // Linux syscall returns -errno on error (as usize, so very large value)
-            const result = std.posix.system.ioctl(self.stdout.handle, std.posix.T.IOCGWINSZ, @intFromPtr(&size));
-            const signed_result: isize = @bitCast(result);
-            if (signed_result < 0) {
-                // Return default size if ioctl fails (e.g., not a TTY)
+        }
+
+        if (is_posix) {
+            var size: posix.winsize = undefined;
+            const result = posix.system.ioctl(self.stdout.handle, posix.T.IOCGWINSZ, @intFromPtr(&size));
+            // On error, ioctl returns -errno as usize (very large value)
+            // Check if result is 0 for success
+            if (result != 0) {
+                // Return default size if ioctl fails
                 return .{ .width = 80, .height = 24 };
             }
             // Fallback if zero dimensions
@@ -172,24 +182,51 @@ pub const AnsiBackend = struct {
                 .height = size.row,
             };
         }
+
+        return .{ .width = 80, .height = 24 };
     }
 
     fn pollEvent(ptr: *anyopaque, timeout_ms: u32) Error!events.Event {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
 
-        // Simple non-blocking read
-        _ = timeout_ms; // TODO: implement proper timeout with poll/select
+        if (is_posix) {
+            // Use poll() for timeout support
+            var fds = [_]posix.pollfd{
+                .{
+                    .fd = self.stdin.handle,
+                    .events = posix.POLL.IN,
+                    .revents = 0,
+                },
+            };
 
-        var buf: [32]u8 = undefined;
-        const n = self.stdin.read(&buf) catch |err| {
-            if (err == error.WouldBlock) return events.Event.none;
-            return Error.IOError;
-        };
+            const poll_result = posix.poll(&fds, @intCast(timeout_ms)) catch {
+                return events.Event.none;
+            };
 
-        if (n == 0) return events.Event.none;
+            if (poll_result == 0) {
+                // Timeout
+                return events.Event.none;
+            }
 
-        // Parse escape sequences
-        return parseEvent(buf[0..n]);
+            if (fds[0].revents & posix.POLL.IN == 0) {
+                return events.Event.none;
+            }
+
+            // Read available bytes
+            var buf: [32]u8 = undefined;
+            const n = self.stdin.read(&buf) catch |err| {
+                if (err == error.WouldBlock) return events.Event.none;
+                return Error.IOError;
+            };
+
+            if (n == 0) return events.Event.none;
+
+            // Parse escape sequences
+            return parseEvent(buf[0..n]);
+        }
+
+        // Fallback for non-POSIX systems (should not reach here)
+        return events.Event.none;
     }
 
     fn hideCursor(ptr: *anyopaque) Error!void {
@@ -243,6 +280,7 @@ fn parseEvent(input: []const u8) events.Event {
                 'D' => .{ .key = .{ .code = .left } },
                 'H' => .{ .key = .{ .code = .home } },
                 'F' => .{ .key = .{ .code = .end } },
+                'Z' => .{ .key = .{ .code = .back_tab } },
                 '3' => if (input.len >= 4 and input[3] == '~')
                     .{ .key = .{ .code = .delete } }
                 else
@@ -255,8 +293,52 @@ fn parseEvent(input: []const u8) events.Event {
                     .{ .key = .{ .code = .page_down } }
                 else
                     .none,
+                '2' => if (input.len >= 4 and input[3] == '~')
+                    .{ .key = .{ .code = .insert } }
+                else
+                    .none,
+                '1' => blk: {
+                    // Could be F1-F4: ESC[1P, ESC[1Q, ESC[1R, ESC[1S
+                    // Or home: ESC[1~
+                    if (input.len >= 4) {
+                        if (input[3] == '~') break :blk .{ .key = .{ .code = .home } };
+                        if (input.len >= 5 and input[3] == ';') {
+                            // Modified keys like ESC[1;5C (Ctrl+Right)
+                            break :blk .none;
+                        }
+                    }
+                    break :blk .none;
+                },
+                '4' => if (input.len >= 4 and input[3] == '~')
+                    .{ .key = .{ .code = .end } }
+                else
+                    .none,
                 else => .none,
             };
+        }
+
+        // SS3 sequences: ESC O (F1-F4 on some terminals)
+        if (input.len >= 3 and input[1] == 'O') {
+            return switch (input[2]) {
+                'P' => .{ .key = .{ .code = .{ .f = 1 } } },
+                'Q' => .{ .key = .{ .code = .{ .f = 2 } } },
+                'R' => .{ .key = .{ .code = .{ .f = 3 } } },
+                'S' => .{ .key = .{ .code = .{ .f = 4 } } },
+                'H' => .{ .key = .{ .code = .home } },
+                'F' => .{ .key = .{ .code = .end } },
+                else => .none,
+            };
+        }
+
+        // Alt+key: ESC followed by key
+        if (input.len == 2) {
+            const c = input[1];
+            if (c >= 32 and c < 127) {
+                return .{ .key = .{
+                    .code = .{ .char = c },
+                    .modifiers = .{ .alt = true },
+                } };
+            }
         }
     }
 

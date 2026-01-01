@@ -197,8 +197,10 @@ pub const Style = struct {
 };
 
 test "Color equality" {
-    try std.testing.expect(Color.red.eql(Color.red));
-    try std.testing.expect(!Color.red.eql(Color.blue));
+    const red: Color = .red;
+    const blue: Color = .blue;
+    try std.testing.expect(red.eql(.red));
+    try std.testing.expect(!red.eql(blue));
     
     const rgb1 = Color{ .rgb = .{ .r = 255, .g = 0, .b = 0 } };
     const rgb2 = Color{ .rgb = .{ .r = 255, .g = 0, .b = 0 } };

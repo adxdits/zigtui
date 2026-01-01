@@ -111,6 +111,4 @@ pub const Backend = struct {
 
 // Platform-specific backends
 pub const AnsiBackend = @import("ansi.zig").AnsiBackend;
-
-// TODO: Windows backend
-// pub const WindowsBackend = @import("windows.zig").WindowsBackend;
+pub const WindowsBackend = @import("windows.zig").WindowsBackend;
