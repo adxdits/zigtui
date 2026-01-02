@@ -31,8 +31,8 @@ pub const AnsiBackend = struct {
             return error.UnsupportedTerminal; // Use windows.zig backend instead
         }
 
-        const stdin = std.io.getStdIn();
-        const stdout = std.io.getStdOut();
+        const stdin = std.fs.File.stdin();
+        const stdout = std.fs.File.stdout();
 
         // Save original terminal settings
         const original = if (is_posix) try posix.tcgetattr(stdin.handle) else {};
