@@ -25,7 +25,47 @@ A Terminal User Interface (TUI) library for Zig, inspired by Ratatui. Build beau
 
 ## Installation
 
-### Option 1: Git Submodule
+### Option 1: Zig fetch
+
+Fetch the zigTUI module:
+
+```bash
+zig fetch --save git+https://github.com/adxdits/zigtui.git
+```
+
+Then in your `build.zig`:
+
+```zig
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    // Import ZigTUI module
+    const zigtui = b.dependency("zigtui", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Your executable
+    const exe = b.addExecutable(.{
+        .name = "myapp",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/main.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zigtui", .module = zigtui.module("zigtui") },
+            },
+        }),
+    });
+
+    b.installArtifact(exe);
+}
+```
+
+### Option 2: Git Submodule
 
 Add ZigTUI as a submodule to your project:
 
@@ -64,7 +104,7 @@ pub fn build(b: *std.Build) void {
 }
 ```
 
-### Option 2: Copy Source Files
+### Option 3: Copy Source Files
 
 Copy the `src/` folder into your project and import directly:
 
