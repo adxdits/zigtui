@@ -76,6 +76,12 @@ extern "kernel32" fn WaitForSingleObject(
     dwMilliseconds: DWORD,
 ) callconv(.winapi) DWORD;
 
+extern "kernel32" fn GetConsoleOutputCP() callconv(.winapi) UINT;
+
+extern "kernel32" fn SetConsoleOutputCP(
+    codepage: UINT,
+) callconv(.winapi) BOOL;
+
 // Input record structures for reading console input
 const INPUT_RECORD = extern struct {
     EventType: WORD,
@@ -153,6 +159,8 @@ const SHIFT_PRESSED: DWORD = 0x0010;
 const WAIT_OBJECT_0: DWORD = 0x00000000;
 const WAIT_TIMEOUT: DWORD = 0x00000102;
 
+const UTF8_CODE_PAGE: UINT = 65001;
+
 pub const WindowsBackend = struct {
     allocator: Allocator,
     stdin_handle: HANDLE,
@@ -163,10 +171,17 @@ pub const WindowsBackend = struct {
     in_alternate_screen: bool = false,
     write_buffer: std.ArrayListUnmanaged(u8) = .empty,
     original_console_info: CONSOLE_SCREEN_BUFFER_INFO = undefined,
+    original_codepage: UINT = undefined,
 
     pub fn init(allocator: Allocator) !WindowsBackend {
         if (!is_windows) {
             return error.UnsupportedTerminal; // Use ansi.zig backend instead
+        }
+
+        //get current codepage and set to utf8 if not set already
+        const original_codepage = GetConsoleOutputCP();
+        if (original_codepage != UTF8_CODE_PAGE) {
+            _ = SetConsoleOutputCP(UTF8_CODE_PAGE);
         }
 
         // Get standard handles using GetStdHandle
@@ -190,6 +205,7 @@ pub const WindowsBackend = struct {
             .original_stdin_mode = original_stdin_mode,
             .original_stdout_mode = original_stdout_mode,
             .original_console_info = original_console_info,
+            .original_codepage = original_codepage,
         };
     }
 
@@ -204,6 +220,11 @@ pub const WindowsBackend = struct {
         // Restore original console settings
         _ = kernel32.SetConsoleTextAttribute(self.stdout_handle, self.original_console_info.wAttributes);
         _ = kernel32.SetConsoleCursorPosition(self.stdout_handle, self.original_console_info.dwCursorPosition);
+
+        // Restore original codepage
+        if (self.original_codepage > 0 and self.original_codepage != UTF8_CODE_PAGE) {
+            _ = SetConsoleOutputCP(self.original_codepage);
+        }
 
         self.write_buffer.deinit(self.allocator);
     }
