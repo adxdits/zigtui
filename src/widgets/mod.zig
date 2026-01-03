@@ -1,4 +1,3 @@
-
 //! Widgets module - Reusable UI components
 
 const std = @import("std");
@@ -52,6 +51,7 @@ pub const Block = struct {
     style: Style = .{},
     border_style: Style = .{},
     title_style: Style = .{},
+    border_symbols: BorderSymbols = BorderSymbols.default(),
 
     pub fn render(self: Block, area: Rect, buf: *Buffer) void {
         // Safety check: skip rendering if area is too small
@@ -85,7 +85,7 @@ pub const Block = struct {
     }
 
     fn renderBorders(self: Block, area: Rect, buf: *Buffer) void {
-        const symbols = BorderSymbols.default();
+        const symbols = self.border_symbols;
 
         // Corners
         if (self.borders.top and self.borders.left) {
@@ -275,4 +275,3 @@ pub const Table = @import("table.zig").Table;
 pub const TableBuilder = @import("table.zig").TableBuilder;
 pub const Row = @import("table.zig").Row;
 pub const Column = @import("table.zig").Column;
-
