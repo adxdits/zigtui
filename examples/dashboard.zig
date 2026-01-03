@@ -68,10 +68,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var backend = if (@import("builtin").os.tag == .windows)
-        try tui.backend.WindowsBackend.init(allocator)
-    else
-        try tui.backend.AnsiBackend.init(allocator);
+    var backend = try tui.backend.init(allocator);
     defer backend.deinit();
 
     var terminal = try Terminal.init(allocator, backend.interface());

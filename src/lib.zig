@@ -24,6 +24,11 @@ pub const Event = events.Event;
 pub const KeyEvent = events.KeyEvent;
 pub const KeyCode = events.KeyCode;
 pub const Backend = backend.Backend;
+pub const NativeBackend = backend.NativeBackend;
+
+/// Initialize the native backend for the current platform.
+/// Convenience function that automatically selects WindowsBackend or AnsiBackend.
+pub const init = backend.init;
 
 test {
     std.testing.refAllDecls(@This());

@@ -181,20 +181,28 @@ pub fn main() !void {
 
 ### Backend
 
-The backend handles platform-specific terminal operations. Use the appropriate backend for your platform:
+The backend handles platform-specific terminal operations. The library automatically selects the correct backend for your platform:
 
 ```zig
-// Windows
+// Automatic platform detection (recommended)
+var backend = try tui.backend.init(allocator);
+defer backend.deinit();
+```
+
+You can also use the `NativeBackend` type alias if you need the type explicitly:
+
+```zig
+var backend: tui.backend.NativeBackend = try tui.backend.init(allocator);
+```
+
+Or select a specific backend manually if needed:
+
+```zig
+// Windows only
 var backend = try tui.backend.WindowsBackend.init(allocator);
 
-// Linux/macOS
+// Linux/macOS only
 var backend = try tui.backend.AnsiBackend.init(allocator);
-
-// Platform detection
-var backend = if (@import("builtin").os.tag == .windows)
-    try tui.backend.WindowsBackend.init(allocator)
-else
-    try tui.backend.AnsiBackend.init(allocator);
 ```
 
 ### Terminal

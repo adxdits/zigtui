@@ -112,3 +112,12 @@ pub const Backend = struct {
 // Platform-specific backends
 pub const AnsiBackend = @import("ansi.zig").AnsiBackend;
 pub const WindowsBackend = @import("windows.zig").WindowsBackend;
+
+/// Native backend for the current platform (Windows or ANSI)
+pub const NativeBackend = if (@import("builtin").os.tag == .windows) WindowsBackend else AnsiBackend;
+
+/// Initialize the native backend for the current platform.
+/// This is a convenience function that automatically selects the correct backend.
+pub fn init(allocator: std.mem.Allocator) !NativeBackend {
+    return NativeBackend.init(allocator);
+}
