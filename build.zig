@@ -44,4 +44,25 @@ pub fn build(b: *std.Build) void {
     run_dashboard.step.dependOn(&install_dashboard.step);
     const run_dashboard_step = b.step("run-dashboard", "Run system monitor dashboard");
     run_dashboard_step.dependOn(&run_dashboard.step);
+
+    // Example: Kitty Graphics
+    const kitty_example = b.addExecutable(.{
+        .name = "kitty_graphics",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/kitty_graphics.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zigtui", .module = zigtui_module },
+            },
+        }),
+    });
+    const install_kitty = b.addInstallArtifact(kitty_example, .{});
+    examples_step.dependOn(&install_kitty.step);
+
+    // Run kitty graphics example
+    const run_kitty = b.addRunArtifact(kitty_example);
+    run_kitty.step.dependOn(&install_kitty.step);
+    const run_kitty_step = b.step("run-kitty", "Run Kitty graphics demo");
+    run_kitty_step.dependOn(&run_kitty.step);
 }

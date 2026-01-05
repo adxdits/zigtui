@@ -10,12 +10,14 @@ A Terminal User Interface (TUI) library for Zig, inspired by Ratatui. Build beau
 
 ## Features
 
-- Cross-platform support (Windows and Linux)
+- Cross-platform support (Windows, Linux, macOS)
 - Cell-based rendering with diff algorithm for efficient updates
 - Constraint-based layouts
 - Composable widgets (Block, Paragraph, List, Gauge, Table)
 - Keyboard and mouse event handling
 - ANSI color and text styling support
+- Kitty Graphics Protocol for image display
+- Unicode block fallback for terminals without graphics support
 - Explicit memory management (no hidden allocations)
 
 ## Requirements
@@ -393,15 +395,69 @@ const vsplit = area.splitVertical(5);
 
 ## Examples
 
-Build and run the dashboard example:
+Build and run the examples:
 
 ```bash
-# Build examples
+# Build all examples
 zig build examples
 
 # Run the system monitor dashboard
 zig build run-dashboard
+
+# Run the Kitty Graphics demo
+zig build run-kitty
 ```
+
+## Graphics Support
+
+ZigTUI includes support for displaying images in the terminal using the Kitty Graphics Protocol.
+
+### Kitty Graphics Protocol
+
+The Kitty Graphics Protocol allows terminals to display true images (PNG, BMP, raw pixel data) directly in the terminal. When the terminal does not support this protocol, ZigTUI automatically falls back to rendering images using Unicode block characters.
+
+### Usage
+
+```zig
+const tui = @import("zigtui");
+
+// Initialize graphics with auto-detection
+var gfx = tui.Graphics.init(allocator);
+defer gfx.deinit();
+
+// Detect terminal capabilities
+const mode = gfx.detect();
+
+// Load a BMP image
+var bmp = try tui.graphics.bmp.loadFile(allocator, "image.bmp");
+
+const image = tui.Image{
+    .data = bmp.data,
+    .width = bmp.width,
+    .height = bmp.height,
+    .format = .rgba,
+    .stride = 4,
+};
+
+// Display based on terminal support
+if (gfx.supportsImages()) {
+    // Terminal supports Kitty Graphics - send escape sequence
+    if (try gfx.drawImage(image, .{ .x = 0, .y = 0 })) |seq| {
+        try backend.write(seq);
+    }
+} else {
+    // Fallback - render using Unicode half-blocks
+    gfx.renderImageToBuffer(image, buffer, area);
+}
+```
+
+### Supported Image Formats
+
+| Format | Kitty Protocol | Fallback Mode |
+|--------|----------------|---------------|
+| BMP (24/32-bit) | Yes | Yes (built-in decoder) |
+| PNG | Yes | No (requires external decoder) |
+| Raw RGBA | Yes | Yes |
 
 ## Platform Notes
 
@@ -410,12 +466,34 @@ zig build run-dashboard
 - Requires Windows 10 or later for Virtual Terminal support
 - Uses native Windows Console API for input handling
 - ANSI escape sequences are enabled automatically
+- Windows Terminal does not support Kitty Graphics Protocol
+- For image display on Windows, use WezTerm or the Unicode block fallback
 
 ### Linux
 
 - Works with any terminal that supports ANSI escape sequences
 - Uses POSIX termios for raw mode
+- Kitty Graphics supported in: Kitty, WezTerm, Konsole (partial)
 - Tested on common terminals (xterm, gnome-terminal, alacritty, kitty)
+
+### macOS
+
+- Works with terminals that support ANSI escape sequences
+- Uses POSIX termios for raw mode
+- Kitty Graphics supported in: Kitty, WezTerm
+- Terminal.app and iTerm2 do not support Kitty Graphics (use fallback)
+
+### Terminal Graphics Support
+
+| Terminal | Platform | Kitty Graphics |
+|----------|----------|----------------|
+| Kitty | Linux, macOS | Full support |
+| WezTerm | Windows, Linux, macOS | Full support |
+| Konsole | Linux | Partial support |
+| foot | Linux (Wayland) | Full support |
+| Windows Terminal | Windows | Not supported (use fallback) |
+| iTerm2 | macOS | Not supported (use fallback) |
+| Terminal.app | macOS | Not supported (use fallback) |
 
 ## License
 
