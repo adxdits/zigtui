@@ -19,8 +19,8 @@ const termios = if (is_posix) std.posix.termios else void;
 
 pub const AnsiBackend = struct {
     allocator: Allocator,
-    stdin: std.io.File,
-    stdout: std.io.File,
+    stdin: std.fs.File,
+    stdout: std.fs.File,
     original_termios: if (is_posix) std.posix.termios else void,
     in_raw_mode: bool = false,
     in_alternate_screen: bool = false,
@@ -31,8 +31,8 @@ pub const AnsiBackend = struct {
             return error.UnsupportedTerminal; // Use windows.zig backend instead
         }
 
-        const stdin = std.io.getStdIn();
-        const stdout = std.io.getStdOut();
+        const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
+        const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
 
         // Save original terminal settings
         const original = if (is_posix) try posix.tcgetattr(stdin.handle) else {};
@@ -259,10 +259,12 @@ fn parseEvent(input: []const u8) events.Event {
             '\t' => .{ .key = .{ .code = .tab } },
             127 => .{ .key = .{ .code = .backspace } }, // DEL
             27 => .{ .key = .{ .code = .esc } },
-            1...8, 11...12, 14...26 => |ctrl| .{ .key = .{ // Ctrl+A to Ctrl+Z (excluding tab=9, newline=10, enter=13)
-                .code = .{ .char = @as(u21, ctrl - 1 + 'a') },
-                .modifiers = .{ .ctrl = true },
-            } },
+            1...8, 11...12, 14...26 => |ctrl| .{
+                .key = .{ // Ctrl+A to Ctrl+Z (excluding tab=9, newline=10, enter=13)
+                    .code = .{ .char = @as(u21, ctrl - 1 + 'a') },
+                    .modifiers = .{ .ctrl = true },
+                },
+            },
             else => .{ .key = .{ .code = .{ .char = c } } },
         };
     }
