@@ -1,0 +1,56 @@
+name: Zig Compatibility Check
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  zig-compat:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch latest stable Zig version
+        id: fetch
+        run: |
+          VERSION=$(curl -s https://ziglang.org/download/index.json | jq -r 'keys[] | select(test("^[0-9]"))' | sort -V | tail -1) # Grab latest stable version
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Restore cached version
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .zig-version-cache
+          key: zig-version-${{ steps.fetch.outputs.version }}
+
+      - name: Check if already tested
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          echo "Already tested Zig ${{ steps.fetch.outputs.version }}, skipping"
+
+      - uses: actions/checkout@v4
+        if: steps.cache.outputs.cache-hit != 'true'
+
+      - name: Setup Zig
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: korandoru/setup-zig@v1
+        with:
+          zig-version: ${{ steps.fetch.outputs.version }}
+
+      - name: Build and Test
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          zig version
+          zig build examples
+          zig build test
+
+      - name: Create cache marker
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: echo "${{ steps.fetch.outputs.version }}" > .zig-version-cache
+
+      - name: Save cache
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .zig-version-cache
+          key: zig-version-${{ steps.fetch.outputs.version }}
