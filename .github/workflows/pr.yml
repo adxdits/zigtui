@@ -1,0 +1,29 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest stable Zig version
+        id: zig-version
+        run: |
+          VERSION=$(curl -s https://ziglang.org/download/index.json | jq -r 'keys[] | select(test("^[0-9]"))' | sort -V | tail -1) # Grabs latest stable release (master pulls from git repo)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup Zig
+        uses: korandoru/setup-zig@v1
+        with:
+          zig-version: ${{ steps.zig-version.outputs.version }}
+
+      - name: Build Examples
+        run: zig build examples
+
+      - name: Test
+        run: zig build test
