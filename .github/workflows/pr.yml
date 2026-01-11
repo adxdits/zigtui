@@ -27,3 +27,18 @@ jobs:
 
       - name: Test
         run: zig build test
+
+      - name: Cache zlint
+        id: cache-zlint
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/bin/zlint
+          key: zlint-latest
+
+      - name: Install zlint
+        if: steps.cache-zlint.outputs.cache-hit != 'true'
+        run: curl -fsSL https://raw.githubusercontent.com/DonIsaac/zlint/refs/heads/main/tasks/install.sh | bash
+
+      - name: Run zlint - Warning only
+        continue-on-error: true
+        run: zlint src/
