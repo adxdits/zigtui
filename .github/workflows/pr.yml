@@ -41,4 +41,4 @@ jobs:
 
       - name: Run zlint - Warning only
         continue-on-error: true
-        run: zlint src/
+        run: zlint src/**/*
