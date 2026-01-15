@@ -2,6 +2,10 @@
 
 const std = @import("std");
 
+/// Built-in themes
+pub const themes = @import("themes.zig");
+pub const Theme = themes.Theme;
+
 /// Color representation supporting various color modes
 pub const Color = union(enum) {
     reset,
