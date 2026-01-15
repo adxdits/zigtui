@@ -16,6 +16,7 @@ A Terminal User Interface (TUI) library for Zig, inspired by Ratatui. Build beau
 - Composable widgets (Block, Paragraph, List, Gauge, Table)
 - Keyboard and mouse event handling
 - ANSI color and text styling support
+- **Built-in themes** (Nord, Dracula, Gruvbox, Catppuccin, Tokyo Night, and more)
 - Kitty Graphics Protocol for image display
 - Unicode block fallback for terminals without graphics support
 - Explicit memory management (no hidden allocations)
@@ -348,6 +349,85 @@ Available colors:
 - Indexed (256 colors): `.{ .indexed = 42 }`
 - Reset to default: `.reset`
 
+### Themes
+
+![ZigTUI Themes Demo](theme.gif)
+
+*Showcase of built-in themes - Switch between 15 beautiful themes on the fly*
+
+**Try it yourself:** Run `zig build run-themes` to see all themes in action!
+
+ZigTUI includes 15 built-in themes for consistent, beautiful styling. Each theme provides semantic colors for all UI elements:
+
+```zig
+const tui = @import("zigtui");
+const themes = tui.themes;
+
+// Use a built-in theme
+const theme = themes.catppuccin_mocha;
+
+// Apply theme styles to widgets
+const block = tui.widgets.Block{
+    .title = "Dashboard",
+    .borders = tui.widgets.Borders.all(),
+    .style = theme.baseStyle(),
+    .border_style = theme.borderFocusedStyle(),
+    .title_style = theme.titleStyle(),
+};
+
+// Use semantic colors
+const success_msg = theme.successStyle();  // Green-ish color
+const error_msg = theme.errorStyle();      // Red-ish color
+const info_msg = theme.infoStyle();        // Blue-ish color
+
+// Smart gauge coloring based on percentage
+const gauge_style = theme.gaugeStyle(85);  // Warning color at 85%
+
+// List item styling with selection state
+const item_style = theme.listItemStyle(selected, focused);
+
+// Table styling
+const header_style = theme.tableHeaderStyle();
+const row_style = theme.tableRowStyle(row_index, is_selected);
+```
+
+**Available themes:**
+
+| Theme | Description |
+|-------|-------------|
+| `themes.default` | Balanced dark theme with cyan accents |
+| `themes.nord` | Arctic, north-bluish color palette |
+| `themes.dracula` | Dark theme with vibrant colors |
+| `themes.monokai` | Refined Monokai color palette |
+| `themes.gruvbox_dark` | Retro groove color scheme (dark) |
+| `themes.gruvbox_light` | Retro groove color scheme (light) |
+| `themes.solarized_dark` | Precision colors (dark) |
+| `themes.solarized_light` | Precision colors (light) |
+| `themes.tokyo_night` | Clean dark theme inspired by Tokyo city lights |
+| `themes.catppuccin_mocha` | Soothing pastel theme (dark) |
+| `themes.catppuccin_latte` | Soothing pastel theme (light) |
+| `themes.one_dark` | Atom's iconic dark theme |
+| `themes.cyberpunk` | Neon colors on dark background |
+| `themes.matrix` | Classic green-on-black hacker aesthetic |
+| `themes.high_contrast` | Maximum readability |
+
+**Theme utilities:**
+
+```zig
+// Get theme by name (case-insensitive)
+if (themes.getByName("dracula")) |theme| {
+    // Use the theme
+}
+
+// Iterate all themes (useful for theme picker)
+for (themes.all_themes) |theme| {
+    std.debug.print("{s}: {s}\n", .{ theme.name, theme.description });
+}
+
+// Get theme names array
+const names = themes.getThemeNames();
+```
+
 ### Buffer Operations
 
 Direct buffer manipulation:
@@ -406,6 +486,9 @@ zig build run-dashboard
 
 # Run the Kitty Graphics demo
 zig build run-kitty
+
+# Run the themes demo
+zig build run-themes
 ```
 
 ## Graphics Support

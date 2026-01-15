@@ -65,4 +65,25 @@ pub fn build(b: *std.Build) void {
     run_kitty.step.dependOn(&install_kitty.step);
     const run_kitty_step = b.step("run-kitty", "Run Kitty graphics demo");
     run_kitty_step.dependOn(&run_kitty.step);
+
+    // Example: Themes Demo
+    const themes_example = b.addExecutable(.{
+        .name = "themes_demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/themes_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zigtui", .module = zigtui_module },
+            },
+        }),
+    });
+    const install_themes = b.addInstallArtifact(themes_example, .{});
+    examples_step.dependOn(&install_themes.step);
+
+    // Run themes demo example
+    const run_themes = b.addRunArtifact(themes_example);
+    run_themes.step.dependOn(&install_themes.step);
+    const run_themes_step = b.step("run-themes", "Run themes demo");
+    run_themes_step.dependOn(&run_themes.step);
 }
