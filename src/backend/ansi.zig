@@ -16,6 +16,14 @@ const is_posix = !is_windows;
 // POSIX types - only available on non-Windows
 const posix = if (is_posix) std.posix else void;
 const termios = if (is_posix) std.posix.termios else void;
+// SIGWINCH - for resize events
+// Global atomic flag must be global because POSIX signal handlers
+// cannot capture instance state
+var global_resize_flag = std.atomic.Value(bool).init(false);
+
+fn handleSigwinch(_: c_int) callconv(.c) void {
+    global_resize_flag.store(true, .release);
+}
 
 pub const AnsiBackend = struct {
     allocator: Allocator,
@@ -25,6 +33,10 @@ pub const AnsiBackend = struct {
     in_raw_mode: bool = false,
     in_alternate_screen: bool = false,
     write_buffer: std.ArrayListUnmanaged(u8) = .empty,
+    //swigwinch handler state
+    // original_sigaction: if (is_posix) posix.Sigaction else void = undefined,
+    original_sigaction: if (is_posix) posix.Sigaction else void = if (is_posix) std.mem.zeroes(posix.Sigaction) else {},
+    sigwinch_installed: bool = false,
 
     pub fn init(allocator: Allocator) !AnsiBackend {
         if (is_windows) {
@@ -106,6 +118,16 @@ pub const AnsiBackend = struct {
             raw.cc[@intFromEnum(posix.V.MIN)] = 0;
 
             posix.tcsetattr(self.stdin.handle, .FLUSH, raw) catch return Error.IOError;
+            //for term resize
+            if (!self.sigwinch_installed) {
+                const new_action = posix.Sigaction{
+                    .handler = .{ .handler = handleSigwinch },
+                    .mask = posix.sigemptyset(),
+                    .flags = 0,
+                };
+                posix.sigaction(posix.SIG.WINCH, &new_action, &self.original_sigaction);
+                self.sigwinch_installed = true;
+            }
             self.in_raw_mode = true;
         }
     }
@@ -116,6 +138,11 @@ pub const AnsiBackend = struct {
 
         if (is_posix) {
             posix.tcsetattr(self.stdin.handle, .FLUSH, self.original_termios) catch return Error.IOError;
+
+            if (self.sigwinch_installed) {
+                posix.sigaction(posix.SIG.WINCH, &self.original_sigaction, null);
+                self.sigwinch_installed = false;
+            }
         }
         self.in_raw_mode = false;
     }
@@ -190,6 +217,13 @@ pub const AnsiBackend = struct {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
 
         if (is_posix) {
+            // check for resize event FIRST
+            if (global_resize_flag.swap(false, .acquire)) {
+                const size = getSize(@ptrCast(@alignCast(self))) catch {
+                    return events.Event.none;
+                };
+                return events.Event{ .resize = .{ .width = size.width, .height = size.height } };
+            }
             // Use poll() for timeout support
             var fds = [_]posix.pollfd{
                 .{
@@ -199,7 +233,16 @@ pub const AnsiBackend = struct {
                 },
             };
 
-            const poll_result = posix.poll(&fds, @intCast(timeout_ms)) catch {
+            const poll_result = posix.poll(&fds, @intCast(timeout_ms)) catch |err| {
+                //sigwinch interupts poll()
+                if (err == error.Interrupted) {
+                    if (global_resize_flag.swap(false, .acquire)) {
+                        const size = getSize(@ptrCast(@alignCast(self))) catch {
+                            return events.Event.none;
+                        };
+                        return events.Event{ .resize = .{ .width = size.width, .height = size.height } };
+                    }
+                }
                 return events.Event.none;
             };
 
