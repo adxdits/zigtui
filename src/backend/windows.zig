@@ -3,6 +3,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Backend = @import("mod.zig").Backend;
+const KeyboardProtocolOptions = @import("mod.zig").KeyboardProtocolOptions;
 const Error = @import("mod.zig").Error;
 const events = @import("../events/mod.zig");
 const render = @import("../render/mod.zig");
@@ -248,6 +249,8 @@ pub const WindowsBackend = struct {
                 .hide_cursor = hideCursor,
                 .show_cursor = showCursor,
                 .set_cursor = setCursor,
+                .enable_keyboard_protocol = enableKeyboardProtocol,
+                .disable_keyboard_protocol = disableKeyboardProtocol,
             },
         };
     }
@@ -539,5 +542,16 @@ pub const WindowsBackend = struct {
         if (kernel32.SetConsoleCursorPosition(self.stdout_handle, coord) == 0) {
             return Error.IOError;
         }
+    }
+
+    fn enableKeyboardProtocol(ptr: *anyopaque, _: KeyboardProtocolOptions) Error!void {
+        _ = ptr;
+        if (!is_windows) return;
+        return Error.UnsupportedTerminal;
+    }
+
+    fn disableKeyboardProtocol(ptr: *anyopaque) Error!void {
+        _ = ptr;
+        // Nothing to disable -- enable always fails on Windows.
     }
 };

@@ -3,9 +3,11 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const Backend = @import("mod.zig").Backend;
+const KeyboardProtocolOptions = @import("mod.zig").KeyboardProtocolOptions;
 const Error = @import("mod.zig").Error;
 const events = @import("../events/mod.zig");
 const render = @import("../render/mod.zig");
+const ansi_input = @import("ansi_input.zig");
 const Allocator = std.mem.Allocator;
 
 const is_windows = builtin.os.tag == .windows;
@@ -33,6 +35,10 @@ pub const AnsiBackend = struct {
     in_raw_mode: bool = false,
     in_alternate_screen: bool = false,
     write_buffer: std.ArrayListUnmanaged(u8) = .empty,
+    input_buffer: std.ArrayListUnmanaged(u8) = .empty,
+    keyboard_flags: u32 = 0,
+    keyboard_push_pop: bool = false,
+    keyboard_enabled: bool = false,
     //swigwinch handler state
     // original_sigaction: if (is_posix) posix.Sigaction else void = undefined,
     original_sigaction: if (is_posix) posix.Sigaction else void = if (is_posix) std.mem.zeroes(posix.Sigaction) else {},
@@ -58,6 +64,10 @@ pub const AnsiBackend = struct {
     }
 
     pub fn deinit(self: *AnsiBackend) void {
+        if (self.keyboard_enabled) {
+            self.stdout.writeAll("\x1b[<u") catch {};
+            self.keyboard_enabled = false;
+        }
         if (self.in_alternate_screen) {
             disableAlternateScreen(self) catch {};
         }
@@ -65,6 +75,7 @@ pub const AnsiBackend = struct {
             exitRawMode(self) catch {};
         }
         self.write_buffer.deinit(self.allocator);
+        self.input_buffer.deinit(self.allocator);
     }
 
     pub fn interface(self: *AnsiBackend) Backend {
@@ -83,6 +94,8 @@ pub const AnsiBackend = struct {
                 .hide_cursor = hideCursor,
                 .show_cursor = showCursor,
                 .set_cursor = setCursor,
+                .enable_keyboard_protocol = enableKeyboardProtocol,
+                .disable_keyboard_protocol = disableKeyboardProtocol,
             },
         };
     }
@@ -224,6 +237,10 @@ pub const AnsiBackend = struct {
                 };
                 return events.Event{ .resize = .{ .width = size.width, .height = size.height } };
             }
+            if (self.parseBufferedEvent()) |event| {
+                return event;
+            }
+
             // Use poll() for timeout support
             var fds = [_]posix.pollfd{
                 .{
@@ -246,17 +263,14 @@ pub const AnsiBackend = struct {
                 return events.Event.none;
             };
 
-            if (poll_result == 0) {
-                // Timeout
-                return events.Event.none;
-            }
+            if (poll_result == 0) return events.Event.none;
 
             if (fds[0].revents & posix.POLL.IN == 0) {
                 return events.Event.none;
             }
 
             // Read available bytes
-            var buf: [32]u8 = undefined;
+            var buf: [64]u8 = undefined;
             const n = self.stdin.read(&buf) catch |err| {
                 if (err == error.WouldBlock) return events.Event.none;
                 return Error.IOError;
@@ -264,8 +278,17 @@ pub const AnsiBackend = struct {
 
             if (n == 0) return events.Event.none;
 
-            // Parse escape sequences
-            return parseEvent(buf[0..n]);
+            try self.input_buffer.appendSlice(self.allocator, buf[0..n]);
+            if (self.input_buffer.items.len > 4096) {
+                self.input_buffer.clearRetainingCapacity();
+                return events.Event.none;
+            }
+
+            if (self.parseBufferedEvent()) |event| {
+                return event;
+            }
+
+            return events.Event.none;
         }
 
         // Fallback for non-POSIX systems (should not reach here)
@@ -288,107 +311,177 @@ pub const AnsiBackend = struct {
         const cmd = std.fmt.bufPrint(&buffer, "\x1b[{d};{d}H", .{ y + 1, x + 1 }) catch return Error.IOError;
         self.stdout.writeAll(cmd) catch return Error.IOError;
     }
-};
 
-/// Parse input bytes into events
-fn parseEvent(input: []const u8) events.Event {
-    if (input.len == 0) return .none;
+    fn enableKeyboardProtocol(ptr: *anyopaque, options: KeyboardProtocolOptions) Error!void {
+        const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
+        if (options.mode == .legacy) return;
 
-    // Single character
-    if (input.len == 1) {
-        const c = input[0];
-        return switch (c) {
-            '\r', '\n' => .{ .key = .{ .code = .enter } },
-            '\t' => .{ .key = .{ .code = .tab } },
-            127 => .{ .key = .{ .code = .backspace } }, // DEL
-            27 => .{ .key = .{ .code = .esc } },
-            1...8, 11...12, 14...26 => |ctrl| .{
-                .key = .{ // Ctrl+A to Ctrl+Z (excluding tab=9, newline=10, enter=13)
-                    .code = .{ .char = @as(u21, ctrl - 1 + 'a') },
-                    .modifiers = .{ .ctrl = true },
-                },
-            },
-            else => .{ .key = .{ .code = .{ .char = c } } },
-        };
+        if (options.detect_support) {
+            const supported = try self.detectKittyKeyboard(options.timeout_ms);
+            if (!supported) return Error.UnsupportedTerminal;
+        }
+
+        // Flush any pending render data so the protocol sequence is not
+        // interleaved with buffered output.
+        if (self.write_buffer.items.len > 0) {
+            self.stdout.writeAll(self.write_buffer.items) catch return Error.IOError;
+            self.write_buffer.clearRetainingCapacity();
+        }
+
+        const flags_to_set: u32 = if (options.flags == 0) 1 else options.flags;
+
+        if (options.use_push_pop) {
+            var buf: [32]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[>{d}u", .{flags_to_set}) catch return Error.IOError;
+            self.stdout.writeAll(seq) catch return Error.IOError;
+        } else {
+            var buf: [48]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[={d};1u", .{flags_to_set}) catch return Error.IOError;
+            self.stdout.writeAll(seq) catch return Error.IOError;
+        }
+
+        self.keyboard_flags = flags_to_set;
+        self.keyboard_push_pop = options.use_push_pop;
+        self.keyboard_enabled = true;
     }
 
-    // Escape sequences
-    if (input[0] == 27) {
-        if (input.len == 1) return .{ .key = .{ .code = .esc } };
+    fn disableKeyboardProtocol(ptr: *anyopaque) Error!void {
+        const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
+        if (!self.keyboard_enabled) return;
 
-        // CSI sequences: ESC [
-        if (input.len >= 3 and input[1] == '[') {
-            return switch (input[2]) {
-                'A' => .{ .key = .{ .code = .up } },
-                'B' => .{ .key = .{ .code = .down } },
-                'C' => .{ .key = .{ .code = .right } },
-                'D' => .{ .key = .{ .code = .left } },
-                'H' => .{ .key = .{ .code = .home } },
-                'F' => .{ .key = .{ .code = .end } },
-                'Z' => .{ .key = .{ .code = .back_tab } },
-                '3' => if (input.len >= 4 and input[3] == '~')
-                    .{ .key = .{ .code = .delete } }
-                else
-                    .none,
-                '5' => if (input.len >= 4 and input[3] == '~')
-                    .{ .key = .{ .code = .page_up } }
-                else
-                    .none,
-                '6' => if (input.len >= 4 and input[3] == '~')
-                    .{ .key = .{ .code = .page_down } }
-                else
-                    .none,
-                '2' => if (input.len >= 4 and input[3] == '~')
-                    .{ .key = .{ .code = .insert } }
-                else
-                    .none,
-                '1' => blk: {
-                    // Could be F1-F4: ESC[1P, ESC[1Q, ESC[1R, ESC[1S
-                    // Or home: ESC[1~
-                    if (input.len >= 4) {
-                        if (input[3] == '~') break :blk .{ .key = .{ .code = .home } };
-                        if (input.len >= 5 and input[3] == ';') {
-                            // Modified keys like ESC[1;5C (Ctrl+Right)
-                            break :blk .none;
-                        }
-                    }
-                    break :blk .none;
+        // Flush any pending render data before sending the protocol sequence.
+        if (self.write_buffer.items.len > 0) {
+            self.stdout.writeAll(self.write_buffer.items) catch return Error.IOError;
+            self.write_buffer.clearRetainingCapacity();
+        }
+
+        if (self.keyboard_push_pop) {
+            self.stdout.writeAll("\x1b[<u") catch return Error.IOError;
+        } else if (self.keyboard_flags != 0) {
+            var buf: [48]u8 = undefined;
+            const seq = std.fmt.bufPrint(&buf, "\x1b[={d};3u", .{self.keyboard_flags}) catch return Error.IOError;
+            self.stdout.writeAll(seq) catch return Error.IOError;
+        }
+
+        self.keyboard_enabled = false;
+    }
+
+    fn detectKittyKeyboard(self: *AnsiBackend, timeout_ms: u32) Error!bool {
+        if (!is_posix) return false;
+
+        self.stdout.writeAll("\x1b[?u") catch return Error.IOError;
+        self.stdout.writeAll("\x1b[c") catch return Error.IOError;
+
+        var buffer: std.ArrayListUnmanaged(u8) = .empty;
+        defer buffer.deinit(self.allocator);
+
+        const deadline = std.time.milliTimestamp() + @as(i64, timeout_ms);
+        var supported = false;
+
+        while (std.time.milliTimestamp() < deadline) {
+            const now = std.time.milliTimestamp();
+            const remaining_ms: u32 = if (deadline > now) @intCast(deadline - now) else 0;
+
+            var fds = [_]posix.pollfd{
+                .{
+                    .fd = self.stdin.handle,
+                    .events = posix.POLL.IN,
+                    .revents = 0,
                 },
-                '4' => if (input.len >= 4 and input[3] == '~')
-                    .{ .key = .{ .code = .end } }
-                else
-                    .none,
-                else => .none,
             };
+
+            const poll_result = posix.poll(&fds, @intCast(remaining_ms)) catch |err| {
+                if (err == error.Interrupted) continue;
+                return Error.IOError;
+            };
+            if (poll_result == 0) break;
+            if (fds[0].revents & posix.POLL.IN == 0) break;
+
+            var temp: [128]u8 = undefined;
+            const n = self.stdin.read(&temp) catch |err| {
+                if (err == error.WouldBlock) break;
+                return Error.IOError;
+            };
+            if (n == 0) break;
+
+            try buffer.appendSlice(self.allocator, temp[0..n]);
+            supported = stripKittyResponses(&buffer) or supported;
         }
 
-        // SS3 sequences: ESC O (F1-F4 on some terminals)
-        if (input.len >= 3 and input[1] == 'O') {
-            return switch (input[2]) {
-                'P' => .{ .key = .{ .code = .{ .f = 1 } } },
-                'Q' => .{ .key = .{ .code = .{ .f = 2 } } },
-                'R' => .{ .key = .{ .code = .{ .f = 3 } } },
-                'S' => .{ .key = .{ .code = .{ .f = 4 } } },
-                'H' => .{ .key = .{ .code = .home } },
-                'F' => .{ .key = .{ .code = .end } },
-                else => .none,
-            };
+        if (buffer.items.len > 0) {
+            try self.input_buffer.appendSlice(self.allocator, buffer.items);
         }
 
-        // Alt+key: ESC followed by key
-        if (input.len == 2) {
-            const c = input[1];
-            if (c >= 32 and c < 127) {
-                return .{ .key = .{
-                    .code = .{ .char = c },
-                    .modifiers = .{ .alt = true },
-                } };
+        return supported;
+    }
+
+    /// Strip `CSI ? ... u` (kitty keyboard query response) and `CSI ? ... c`
+    /// (DA1 sentinel response) from the buffer. Returns true if a kitty
+    /// keyboard response (`u` terminator) was found, indicating support.
+    fn stripKittyResponses(buffer: *std.ArrayListUnmanaged(u8)) bool {
+        var supported = false;
+        var i: usize = 0;
+        while (i + 2 < buffer.items.len) {
+            if (buffer.items[i] == 0x1b and buffer.items[i + 1] == '[' and buffer.items[i + 2] == '?') {
+                var j: usize = i + 3;
+                while (j < buffer.items.len) : (j += 1) {
+                    const b = buffer.items[j];
+                    if (b == 'u' or b == 'c') {
+                        if (b == 'u') supported = true;
+                        dropRange(buffer, i, j + 1 - i);
+                        // Restart scan -- indices shifted after removal.
+                        i = 0;
+                        break;
+                    }
+                    if (!((b >= '0' and b <= '9') or b == ';')) {
+                        // Not a response we recognise; skip past the ESC byte.
+                        i += 1;
+                        break;
+                    }
+                }
+                if (j >= buffer.items.len) break;
+            } else {
+                i += 1;
             }
         }
+        return supported;
     }
 
-    return .none;
-}
+    fn dropRange(buffer: *std.ArrayListUnmanaged(u8), start: usize, len: usize) void {
+        if (len == 0 or start >= buffer.items.len) return;
+        const clamped = @min(len, buffer.items.len - start);
+        // replaceRange with empty slice is a shrink-only operation; cannot OOM.
+        buffer.replaceRange(undefined, start, clamped, &.{}) catch unreachable;
+    }
+
+    fn parseBufferedEvent(self: *AnsiBackend) ?events.Event {
+        while (self.input_buffer.items.len > 0) {
+            switch (ansi_input.parse(self.input_buffer.items)) {
+                .complete => |complete| {
+                    self.consumeInput(complete.consumed);
+                    if (complete.event == .none) continue;
+                    return complete.event;
+                },
+                .incomplete => return null,
+                .invalid => |consumed| {
+                    const drop_count = if (consumed == 0) 1 else consumed;
+                    self.consumeInput(@min(drop_count, self.input_buffer.items.len));
+                },
+            }
+        }
+        return null;
+    }
+
+    fn consumeInput(self: *AnsiBackend, count: usize) void {
+        if (count == 0 or self.input_buffer.items.len == 0) return;
+        if (count >= self.input_buffer.items.len) {
+            self.input_buffer.clearRetainingCapacity();
+            return;
+        }
+        // replaceRange with empty slice is a shrink-only operation; cannot OOM.
+        self.input_buffer.replaceRange(undefined, 0, count, &.{}) catch unreachable;
+    }
+};
 
 test "AnsiBackend basic" {
     if (is_windows) return error.SkipZigTest;

@@ -8,6 +8,10 @@ pub const KeyModifiers = packed struct {
     ctrl: bool = false,
     alt: bool = false,
     meta: bool = false,
+    super: bool = false,
+    hyper: bool = false,
+    caps_lock: bool = false,
+    num_lock: bool = false,
 
     pub const NONE = KeyModifiers{};
     pub const SHIFT = KeyModifiers{ .shift = true };
@@ -18,7 +22,8 @@ pub const KeyModifiers = packed struct {
 /// Key codes for keyboard input
 pub const KeyCode = union(enum) {
     char: u21,
-    f: u8, // F1-F12
+    f: u8, // F1-F35
+    functional: u32,
     backspace,
     enter,
     left,
@@ -47,10 +52,18 @@ pub const KeyCode = union(enum) {
     }
 };
 
+/// Key event type
+pub const KeyEventKind = enum {
+    press,
+    repeat,
+    release,
+};
+
 /// Keyboard event
 pub const KeyEvent = struct {
     code: KeyCode,
     modifiers: KeyModifiers = .{},
+    kind: KeyEventKind = .press,
 
     /// Check if Ctrl is pressed
     pub fn isCtrl(self: KeyEvent) bool {

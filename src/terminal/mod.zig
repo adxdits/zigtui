@@ -6,6 +6,7 @@ const render = @import("../render/mod.zig");
 const style = @import("../style/mod.zig");
 const Allocator = std.mem.Allocator;
 const Backend = backend.Backend;
+const KeyboardProtocolOptions = backend.KeyboardProtocolOptions;
 const Buffer = render.Buffer;
 
 pub const Error = backend.Error;
@@ -189,6 +190,16 @@ pub const Terminal = struct {
     /// Set cursor position
     pub fn setCursor(self: *Terminal, x: u16, y: u16) !void {
         try self.backend_impl.setCursor(x, y);
+    }
+
+    /// Enable a keyboard protocol (e.g. Kitty CSI u).
+    pub fn enableKeyboardProtocol(self: *Terminal, options: KeyboardProtocolOptions) !void {
+        try self.backend_impl.enableKeyboardProtocol(options);
+    }
+
+    /// Disable the active keyboard protocol.
+    pub fn disableKeyboardProtocol(self: *Terminal) !void {
+        try self.backend_impl.disableKeyboardProtocol();
     }
 
     /// Get terminal size
