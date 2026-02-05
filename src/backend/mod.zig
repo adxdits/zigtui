@@ -28,6 +28,19 @@ pub const Error = error{
     ConnectionResetByPeer,
 } || std.mem.Allocator.Error;
 
+pub const KeyboardProtocolMode = enum {
+    legacy,
+    kitty,
+};
+
+pub const KeyboardProtocolOptions = struct {
+    mode: KeyboardProtocolMode = .legacy,
+    flags: u32 = 0,
+    use_push_pop: bool = true,
+    detect_support: bool = false,
+    timeout_ms: u32 = 50,
+};
+
 /// Backend interface for terminal operations
 pub const Backend = struct {
     ptr: *anyopaque,
@@ -46,6 +59,8 @@ pub const Backend = struct {
         hide_cursor: *const fn (ptr: *anyopaque) Error!void,
         show_cursor: *const fn (ptr: *anyopaque) Error!void,
         set_cursor: *const fn (ptr: *anyopaque, x: u16, y: u16) Error!void,
+        enable_keyboard_protocol: *const fn (ptr: *anyopaque, options: KeyboardProtocolOptions) Error!void,
+        disable_keyboard_protocol: *const fn (ptr: *anyopaque) Error!void,
     };
 
     /// Enter raw mode (disable line buffering, echo, etc.)
@@ -106,6 +121,16 @@ pub const Backend = struct {
     /// Set cursor position
     pub fn setCursor(self: Backend, x: u16, y: u16) Error!void {
         return self.vtable.set_cursor(self.ptr, x, y);
+    }
+
+    /// Enable a keyboard protocol (e.g. Kitty CSI u).
+    pub fn enableKeyboardProtocol(self: Backend, options: KeyboardProtocolOptions) Error!void {
+        return self.vtable.enable_keyboard_protocol(self.ptr, options);
+    }
+
+    /// Disable the active keyboard protocol.
+    pub fn disableKeyboardProtocol(self: Backend) Error!void {
+        return self.vtable.disable_keyboard_protocol(self.ptr);
     }
 };
 
