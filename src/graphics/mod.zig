@@ -28,7 +28,7 @@ pub const GraphicsMode = enum {
     ascii,
 };
 
-/// Unified graphics interface with automatic fallback
+/// Graphics interface — falls back to block characters if needed
 pub const Graphics = struct {
     allocator: Allocator,
     mode: GraphicsMode,
@@ -147,8 +147,7 @@ pub const Graphics = struct {
         }
     }
 
-    /// Render an image to a text buffer using Unicode block characters
-    /// This provides a fallback when the terminal doesn't support graphics protocols
+    /// Render an image as Unicode block characters (fallback for terminals without graphics support)
     pub fn renderImageToBuffer(
         self: *Graphics,
         image: Image,

@@ -1,49 +1,16 @@
-
-<div align="right">
-  <details>
-    <summary >🌐 Language</summary>
-    <div>
-      <div align="center">
-        <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=en">English</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=zh-CN">简体中文</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=zh-TW">繁體中文</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=ja">日本語</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=ko">한국어</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=hi">हिन्दी</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=th">ไทย</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=fr">Français</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=de">Deutsch</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=es">Español</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=it">Italiano</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=ru">Русский</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=pt">Português</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=nl">Nederlands</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=pl">Polski</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=ar">العربية</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=fa">فارسی</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=tr">Türkçe</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=vi">Tiếng Việt</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=id">Bahasa Indonesia</a>
-        | <a href="https://openaitx.github.io/view.html?user=adxdits&project=zigtui&lang=as">অসমীয়া</
-      </div>
-    </div>
-  </details>
-</div>
-
 # ZigTUI
 
-Cross-platform TUI library for Zig, inspired by [Ratatui](https://github.com/ratatui/ratatui).
+A TUI library for Zig, inspired by [Ratatui](https://github.com/ratatui/ratatui). Works on Windows, Linux, and macOS.
 
 ![ZigTUI Dashboard](dashboard.gif)
 
 ## Features
 
-- **Cross-platform** — Windows, Linux, macOS
-- **Efficient rendering** — Cell-based diffing, only redraws what changed
-- **Widgets** — Block, Paragraph, List, Gauge, Table
-- **15 built-in themes** — Nord, Dracula, Gruvbox, Catppuccin, Tokyo Night...
-- **Kitty Graphics Protocol** — Display images (with Unicode fallback)
-- **No hidden allocations** — Explicit memory management
+- Cell-based diffing (only redraws what changed)
+- Widgets: Block, Paragraph, List, Gauge, Table
+- 15 built-in themes (Nord, Dracula, Gruvbox, Catppuccin, Tokyo Night, etc.)
+- Kitty Graphics Protocol support with Unicode fallback
+- No hidden allocations
 
 ## Requirements
 
@@ -208,4 +175,4 @@ MIT
 
 ## Contributing
 
-Issues and PRs welcome.
+Issues and PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.

@@ -1,4 +1,4 @@
-//! Rendering module - Buffer, Cell, and rendering primitives
+//! Buffer, Cell, and rendering
 
 const std = @import("std");
 const style = @import("../style/mod.zig");

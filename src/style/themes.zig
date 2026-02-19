@@ -1,5 +1,4 @@
-//! Built-in themes for ZigTUI
-//! Provides pre-configured color schemes for terminal applications
+//! Built-in color themes
 
 const style = @import("mod.zig");
 const Color = style.Color;
@@ -37,10 +36,6 @@ pub const Theme = struct {
     text: Color,
     text_muted: Color,
     text_inverted: Color,
-
-    // ============================================
-    // Convenience methods to create styled elements
-    // ============================================
 
     /// Get style for primary elements (buttons, active items)
     pub fn primaryStyle(self: Theme) Style {
@@ -171,10 +166,6 @@ pub const Theme = struct {
         }
     }
 };
-
-// ============================================
-// Built-in Themes
-// ============================================
 
 /// Default dark theme - balanced and easy on the eyes
 pub const default = Theme{
@@ -506,10 +497,6 @@ pub const high_contrast = Theme{
     .text_inverted = .black,
 };
 
-// ============================================
-// Theme List and Utilities
-// ============================================
-
 /// Array of all built-in themes for iteration
 pub const all_themes = [_]*const Theme{
     &default,
@@ -559,19 +546,15 @@ fn eqlIgnoreCase(a: []const u8, b: []const u8) bool {
     return true;
 }
 
-// ============================================
-// Tests
-// ============================================
-
 const std = @import("std");
 
 test "theme style generation" {
     const theme = default;
-    
+
     const primary = theme.primaryStyle();
     try std.testing.expect(primary.fg != null);
     try std.testing.expect(primary.fg.?.eql(.cyan));
-    
+
     const success = theme.successStyle();
     try std.testing.expect(success.fg.?.eql(.green));
 }
@@ -580,10 +563,10 @@ test "get theme by name" {
     const theme = getByName("Nord");
     try std.testing.expect(theme != null);
     try std.testing.expectEqualStrings("Nord", theme.?.name);
-    
+
     const invalid = getByName("NonExistent");
     try std.testing.expect(invalid == null);
-    
+
     // Case insensitive
     const dracula_theme = getByName("DRACULA");
     try std.testing.expect(dracula_theme != null);

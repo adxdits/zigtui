@@ -1,4 +1,4 @@
-//! Event module - Input events and event handling
+//! Input event types
 
 const std = @import("std");
 
