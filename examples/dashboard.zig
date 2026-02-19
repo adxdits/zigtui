@@ -1,5 +1,4 @@
-//! ZigTUI Dashboard Demo
-//! A beautiful terminal dashboard showcasing the library's capabilities
+//! Dashboard demo
 //! Controls: Tab to switch panels, Arrow keys to navigate, 'q' to quit
 
 const std = @import("std");

@@ -1,4 +1,4 @@
-//! Backend module - Terminal backend abstraction
+//! Terminal I/O backend
 
 const std = @import("std");
 const events = @import("../events/mod.zig");

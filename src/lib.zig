@@ -1,5 +1,4 @@
-//! ZigTUI - Terminal UI Library for Zig
-//! Inspired by Ratatui, designed for performance and safety
+//! ZigTUI - Terminal UI library for Zig
 
 const std = @import("std");
 

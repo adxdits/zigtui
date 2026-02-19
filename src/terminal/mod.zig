@@ -1,4 +1,4 @@
-//! Terminal module - High-level terminal interface
+//! Terminal state and drawing
 
 const std = @import("std");
 const backend = @import("../backend/mod.zig");

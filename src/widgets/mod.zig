@@ -1,4 +1,4 @@
-//! Widgets module - Reusable UI components
+//! Widget types and rendering
 
 const std = @import("std");
 const render = @import("../render/mod.zig");
