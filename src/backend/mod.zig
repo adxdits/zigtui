@@ -61,6 +61,8 @@ pub const Backend = struct {
         set_cursor: *const fn (ptr: *anyopaque, x: u16, y: u16) Error!void,
         enable_keyboard_protocol: *const fn (ptr: *anyopaque, options: KeyboardProtocolOptions) Error!void,
         disable_keyboard_protocol: *const fn (ptr: *anyopaque) Error!void,
+        enable_mouse: *const fn (ptr: *anyopaque) Error!void,
+        disable_mouse: *const fn (ptr: *anyopaque) Error!void,
     };
 
     /// Enter raw mode (disable line buffering, echo, etc.)
@@ -131,6 +133,16 @@ pub const Backend = struct {
     /// Disable the active keyboard protocol.
     pub fn disableKeyboardProtocol(self: Backend) Error!void {
         return self.vtable.disable_keyboard_protocol(self.ptr);
+    }
+
+    /// Enable mouse event reporting.
+    pub fn enableMouse(self: Backend) Error!void {
+        return self.vtable.enable_mouse(self.ptr);
+    }
+
+    /// Disable mouse event reporting.
+    pub fn disableMouse(self: Backend) Error!void {
+        return self.vtable.disable_mouse(self.ptr);
     }
 };
 

@@ -122,6 +122,13 @@ fn parseCsi(input: []const u8) ParseResult {
         },
         '~' => return parseCsiTilde(params, consumed),
         'u' => return parseCsiU(params, consumed),
+        'M', 'm' => {
+            // SGR mouse: CSI < Cb ; Cx ; Cy M/m  (press/release)
+            if (params.len > 0 and params[0] == '<') {
+                return parseSgrMouse(params[1..], final, consumed);
+            }
+            return .{ .complete = .{ .event = .none, .consumed = consumed } };
+        },
         else => return .{ .complete = .{ .event = .none, .consumed = consumed } },
     }
 }
@@ -217,6 +224,82 @@ fn parseCsiU(params: []const u8, consumed: usize) ParseResult {
     const kind = decodeEventType(event_type_value);
 
     return .{ .complete = .{ .event = .{ .key = .{ .code = key_code_mapped, .modifiers = modifiers, .kind = kind } }, .consumed = consumed } };
+}
+
+fn parseSgrMouse(params: []const u8, final: u8, consumed: usize) ParseResult {
+    // params = "Cb;Cx;Cy", final = 'M' (press/motion) or 'm' (release)
+    var fields: [3]u32 = .{ 0, 0, 0 };
+    var field_index: usize = 0;
+    var start: usize = 0;
+    var i: usize = 0;
+    while (i <= params.len) : (i += 1) {
+        if (i == params.len or params[i] == ';') {
+            if (field_index < 3) {
+                fields[field_index] = parseNumber(params[start..i]) orelse 0;
+            }
+            field_index += 1;
+            start = i + 1;
+        }
+    }
+    if (field_index < 3) return .{ .complete = .{ .event = .none, .consumed = consumed } };
+
+    const cb = fields[0];
+    const cx = fields[1];
+    const cy = fields[2];
+
+    // Decode button and event kind from cb
+    const button_bits = cb & 0b11;
+    const is_motion = (cb & 32) != 0;
+    const is_scroll = (cb & 64) != 0;
+
+    var kind: events.MouseEventKind = undefined;
+    var button: events.MouseButton = .left;
+
+    if (is_scroll) {
+        kind = if (button_bits == 0) .scroll_up else .scroll_down;
+    } else if (final == 'm') {
+        kind = .up;
+        button = switch (button_bits) {
+            0 => .left,
+            1 => .middle,
+            2 => .right,
+            else => .left,
+        };
+    } else if (is_motion) {
+        kind = .moved;
+        button = switch (button_bits) {
+            0 => .left,
+            1 => .middle,
+            2 => .right,
+            else => .left,
+        };
+    } else {
+        kind = .down;
+        button = switch (button_bits) {
+            0 => .left,
+            1 => .middle,
+            2 => .right,
+            else => .left,
+        };
+    }
+
+    const modifiers = events.KeyModifiers{
+        .shift = (cb & 4) != 0,
+        .alt = (cb & 8) != 0,
+        .ctrl = (cb & 16) != 0,
+    };
+
+    // SGR coordinates are 1-based
+    const x: u16 = if (cx > 0) @intCast(cx - 1) else 0;
+    const y: u16 = if (cy > 0) @intCast(cy - 1) else 0;
+
+    return .{ .complete = .{ .event = .{ .mouse = .{
+        .kind = kind,
+        .button = button,
+        .x = x,
+        .y = y,
+        .modifiers = modifiers,
+    } }, .consumed = consumed } };
 }
 
 fn parseParams(params: []const u8) struct { primary: u32, modifiers: u32 } {
@@ -410,4 +493,62 @@ test "parse incomplete CSI" {
     const input = "\x1b[1;5";
     const result = parse(input);
     try std.testing.expect(result == .incomplete);
+}
+
+test "parse SGR mouse left click" {
+    const input = "\x1b[<0;10;20M";
+    const result = parse(input);
+    try std.testing.expect(result == .complete);
+    const complete = result.complete;
+    try std.testing.expectEqual(@as(usize, input.len), complete.consumed);
+    switch (complete.event) {
+        .mouse => |mouse| {
+            try std.testing.expectEqual(events.MouseEventKind.down, mouse.kind);
+            try std.testing.expectEqual(events.MouseButton.left, mouse.button);
+            try std.testing.expectEqual(@as(u16, 9), mouse.x);
+            try std.testing.expectEqual(@as(u16, 19), mouse.y);
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "parse SGR mouse release" {
+    const input = "\x1b[<0;5;3m";
+    const result = parse(input);
+    try std.testing.expect(result == .complete);
+    switch (result.complete.event) {
+        .mouse => |mouse| {
+            try std.testing.expectEqual(events.MouseEventKind.up, mouse.kind);
+            try std.testing.expectEqual(events.MouseButton.left, mouse.button);
+            try std.testing.expectEqual(@as(u16, 4), mouse.x);
+            try std.testing.expectEqual(@as(u16, 2), mouse.y);
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "parse SGR mouse scroll up" {
+    const input = "\x1b[<64;1;1M";
+    const result = parse(input);
+    try std.testing.expect(result == .complete);
+    switch (result.complete.event) {
+        .mouse => |mouse| {
+            try std.testing.expectEqual(events.MouseEventKind.scroll_up, mouse.kind);
+        },
+        else => return error.TestExpectedEqual,
+    }
+}
+
+test "parse SGR mouse right click with ctrl" {
+    const input = "\x1b[<18;15;10M";
+    const result = parse(input);
+    try std.testing.expect(result == .complete);
+    switch (result.complete.event) {
+        .mouse => |mouse| {
+            try std.testing.expectEqual(events.MouseEventKind.down, mouse.kind);
+            try std.testing.expectEqual(events.MouseButton.right, mouse.button);
+            try std.testing.expect(mouse.modifiers.ctrl);
+        },
+        else => return error.TestExpectedEqual,
+    }
 }

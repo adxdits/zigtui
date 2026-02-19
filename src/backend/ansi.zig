@@ -39,6 +39,7 @@ pub const AnsiBackend = struct {
     keyboard_flags: u32 = 0,
     keyboard_push_pop: bool = false,
     keyboard_enabled: bool = false,
+    mouse_enabled: bool = false,
     //swigwinch handler state
     // original_sigaction: if (is_posix) posix.Sigaction else void = undefined,
     original_sigaction: if (is_posix) posix.Sigaction else void = if (is_posix) std.mem.zeroes(posix.Sigaction) else {},
@@ -64,6 +65,10 @@ pub const AnsiBackend = struct {
     }
 
     pub fn deinit(self: *AnsiBackend) void {
+        if (self.mouse_enabled) {
+            self.stdout.writeAll("\x1b[?1006l\x1b[?1003l\x1b[?1000l") catch {};
+            self.mouse_enabled = false;
+        }
         if (self.keyboard_enabled) {
             self.stdout.writeAll("\x1b[<u") catch {};
             self.keyboard_enabled = false;
@@ -96,6 +101,8 @@ pub const AnsiBackend = struct {
                 .set_cursor = setCursor,
                 .enable_keyboard_protocol = enableKeyboardProtocol,
                 .disable_keyboard_protocol = disableKeyboardProtocol,
+                .enable_mouse = enableMouse,
+                .disable_mouse = disableMouse,
             },
         };
     }
@@ -364,6 +371,21 @@ pub const AnsiBackend = struct {
         }
 
         self.keyboard_enabled = false;
+    }
+
+    fn enableMouse(ptr: *anyopaque) Error!void {
+        const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
+        if (self.mouse_enabled) return;
+        // Enable X10 mouse reporting + SGR extended coordinates + any-event tracking
+        self.stdout.writeAll("\x1b[?1000h\x1b[?1003h\x1b[?1006h") catch return Error.IOError;
+        self.mouse_enabled = true;
+    }
+
+    fn disableMouse(ptr: *anyopaque) Error!void {
+        const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
+        if (!self.mouse_enabled) return;
+        self.stdout.writeAll("\x1b[?1006l\x1b[?1003l\x1b[?1000l") catch return Error.IOError;
+        self.mouse_enabled = false;
     }
 
     fn detectKittyKeyboard(self: *AnsiBackend, timeout_ms: u32) Error!bool {

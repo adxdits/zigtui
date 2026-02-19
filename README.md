@@ -8,6 +8,7 @@ A TUI library for Zig, inspired by [Ratatui](https://github.com/ratatui/ratatui)
 
 - Cell-based diffing (only redraws what changed)
 - Widgets: Block, Paragraph, List, Gauge, Table
+- Mouse support (SGR mode on Unix, native Console API on Windows)
 - 15 built-in themes (Nord, Dracula, Gruvbox, Catppuccin, Tokyo Night, etc.)
 - Kitty Graphics Protocol support with Unicode fallback
 - No hidden allocations
@@ -138,6 +139,7 @@ Run `zig build run-themes` to preview all themes.
 zig build run-dashboard   # System monitor demo
 zig build run-kitty       # Image display demo  
 zig build run-themes      # Theme showcase
+zig build run-mouse       # Mouse input demo
 ```
 
 ## Kitty Graphics

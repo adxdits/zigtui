@@ -28,6 +28,7 @@ const ENABLE_ECHO_INPUT: DWORD = 0x0004;
 const ENABLE_LINE_INPUT: DWORD = 0x0002;
 const ENABLE_PROCESSED_INPUT: DWORD = 0x0001;
 const ENABLE_WINDOW_INPUT: DWORD = 0x0008;
+const ENABLE_MOUSE_INPUT: DWORD = 0x0010;
 const ENABLE_VIRTUAL_TERMINAL_PROCESSING: DWORD = 0x0004;
 const ENABLE_VIRTUAL_TERMINAL_INPUT: DWORD = 0x0200;
 
@@ -117,6 +118,13 @@ const MOUSE_EVENT_RECORD = extern struct {
     dwEventFlags: DWORD,
 };
 
+// Mouse button state / event flags
+const FROM_LEFT_1ST_BUTTON_PRESSED: DWORD = 0x0001;
+const RIGHTMOST_BUTTON_PRESSED: DWORD = 0x0002;
+const FROM_LEFT_2ND_BUTTON_PRESSED: DWORD = 0x0004;
+const MOUSE_MOVED: DWORD = 0x0001;
+const MOUSE_WHEELED: DWORD = 0x0004;
+
 const WINDOW_BUFFER_SIZE_RECORD = extern struct {
     dwSize: COORD,
 };
@@ -173,6 +181,7 @@ pub const WindowsBackend = struct {
     original_stdout_mode: DWORD = 0,
     in_raw_mode: bool = false,
     in_alternate_screen: bool = false,
+    mouse_enabled: bool = false,
     write_buffer: std.ArrayListUnmanaged(u8) = .empty,
     original_console_info: CONSOLE_SCREEN_BUFFER_INFO = undefined,
     original_codepage: UINT = undefined,
@@ -251,6 +260,8 @@ pub const WindowsBackend = struct {
                 .set_cursor = setCursor,
                 .enable_keyboard_protocol = enableKeyboardProtocol,
                 .disable_keyboard_protocol = disableKeyboardProtocol,
+                .enable_mouse = enableMouse,
+                .disable_mouse = disableMouse,
             },
         };
     }
@@ -489,6 +500,42 @@ pub const WindowsBackend = struct {
                     .height = @intCast(size_event.dwSize.Y),
                 } };
             },
+            MOUSE_EVENT => {
+                if (!self.mouse_enabled) return events.Event.none;
+                const me = record.Event.MouseEvent;
+
+                const ctrl_pressed = (me.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)) != 0;
+                const alt_pressed = (me.dwControlKeyState & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) != 0;
+                const shift_pressed = (me.dwControlKeyState & SHIFT_PRESSED) != 0;
+                const modifiers = events.KeyModifiers{ .ctrl = ctrl_pressed, .alt = alt_pressed, .shift = shift_pressed };
+
+                const x: u16 = @intCast(me.dwMousePosition.X);
+                const y: u16 = @intCast(me.dwMousePosition.Y);
+
+                if (me.dwEventFlags & MOUSE_WHEELED != 0) {
+                    // High word of dwButtonState is wheel delta (signed)
+                    const delta: i16 = @bitCast(@as(u16, @intCast(me.dwButtonState >> 16)));
+                    const kind: events.MouseEventKind = if (delta > 0) .scroll_up else .scroll_down;
+                    return events.Event{ .mouse = .{ .kind = kind, .button = .left, .x = x, .y = y, .modifiers = modifiers } };
+                }
+
+                if (me.dwEventFlags & MOUSE_MOVED != 0) {
+                    return events.Event{ .mouse = .{ .kind = .moved, .button = .left, .x = x, .y = y, .modifiers = modifiers } };
+                }
+
+                const button: events.MouseButton = if (me.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED != 0)
+                    .left
+                else if (me.dwButtonState & RIGHTMOST_BUTTON_PRESSED != 0)
+                    .right
+                else if (me.dwButtonState & FROM_LEFT_2ND_BUTTON_PRESSED != 0)
+                    .middle
+                else
+                    .left;
+
+                const kind: events.MouseEventKind = if (me.dwButtonState & (FROM_LEFT_1ST_BUTTON_PRESSED | RIGHTMOST_BUTTON_PRESSED | FROM_LEFT_2ND_BUTTON_PRESSED) != 0) .down else .up;
+
+                return events.Event{ .mouse = .{ .kind = kind, .button = button, .x = x, .y = y, .modifiers = modifiers } };
+            },
             FOCUS_EVENT => {
                 const focus_event = record.Event.FocusEvent;
                 if (focus_event.bSetFocus != 0) {
@@ -553,5 +600,27 @@ pub const WindowsBackend = struct {
     fn disableKeyboardProtocol(ptr: *anyopaque) Error!void {
         _ = ptr;
         // Nothing to disable -- enable always fails on Windows.
+    }
+
+    fn enableMouse(ptr: *anyopaque) Error!void {
+        const self: *WindowsBackend = @ptrCast(@alignCast(ptr));
+        if (self.mouse_enabled) return;
+        if (!is_windows) return;
+        var mode: DWORD = 0;
+        _ = kernel32.GetConsoleMode(self.stdin_handle, &mode);
+        mode |= ENABLE_MOUSE_INPUT;
+        _ = kernel32.SetConsoleMode(self.stdin_handle, mode);
+        self.mouse_enabled = true;
+    }
+
+    fn disableMouse(ptr: *anyopaque) Error!void {
+        const self: *WindowsBackend = @ptrCast(@alignCast(ptr));
+        if (!self.mouse_enabled) return;
+        if (!is_windows) return;
+        var mode: DWORD = 0;
+        _ = kernel32.GetConsoleMode(self.stdin_handle, &mode);
+        mode &= ~ENABLE_MOUSE_INPUT;
+        _ = kernel32.SetConsoleMode(self.stdin_handle, mode);
+        self.mouse_enabled = false;
     }
 };

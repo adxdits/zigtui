@@ -202,6 +202,16 @@ pub const Terminal = struct {
         try self.backend_impl.disableKeyboardProtocol();
     }
 
+    /// Enable mouse event reporting.
+    pub fn enableMouse(self: *Terminal) !void {
+        try self.backend_impl.enableMouse();
+    }
+
+    /// Disable mouse event reporting.
+    pub fn disableMouse(self: *Terminal) !void {
+        try self.backend_impl.disableMouse();
+    }
+
     /// Get terminal size
     pub fn getSize(self: *Terminal) !render.Size {
         return try self.backend_impl.getSize();
