@@ -1,5 +1,3 @@
-//! ANSI escape sequence backend for Unix-like systems
-
 const std = @import("std");
 const builtin = @import("builtin");
 const Backend = @import("mod.zig").Backend;
@@ -437,9 +435,6 @@ pub const AnsiBackend = struct {
         return supported;
     }
 
-    /// Strip `CSI ? ... u` (kitty keyboard query response) and `CSI ? ... c`
-    /// (DA1 sentinel response) from the buffer. Returns true if a kitty
-    /// keyboard response (`u` terminator) was found, indicating support.
     fn stripKittyResponses(buffer: *std.ArrayListUnmanaged(u8)) bool {
         var supported = false;
         var i: usize = 0;

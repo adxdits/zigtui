@@ -1,5 +1,3 @@
-//! Terminal I/O backend
-
 const std = @import("std");
 const events = @import("../events/mod.zig");
 const render = @import("../render/mod.zig");
@@ -11,6 +9,7 @@ pub const Error = error{
     NotInRawMode,
     NotATerminal,
     Unexpected,
+    // OS-level write errors (surfaced through std)
     ProcessOrphaned,
     AccessDenied,
     DiskQuota,
@@ -41,7 +40,6 @@ pub const KeyboardProtocolOptions = struct {
     timeout_ms: u32 = 50,
 };
 
-/// Backend interface for terminal operations
 pub const Backend = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
@@ -65,82 +63,66 @@ pub const Backend = struct {
         disable_mouse: *const fn (ptr: *anyopaque) Error!void,
     };
 
-    /// Enter raw mode (disable line buffering, echo, etc.)
     pub fn enterRawMode(self: Backend) Error!void {
         return self.vtable.enter_raw_mode(self.ptr);
     }
 
-    /// Exit raw mode
     pub fn exitRawMode(self: Backend) Error!void {
         return self.vtable.exit_raw_mode(self.ptr);
     }
 
-    /// Enable alternate screen buffer
     pub fn enableAlternateScreen(self: Backend) Error!void {
         return self.vtable.enable_alternate_screen(self.ptr);
     }
 
-    /// Disable alternate screen buffer
     pub fn disableAlternateScreen(self: Backend) Error!void {
         return self.vtable.disable_alternate_screen(self.ptr);
     }
 
-    /// Clear the screen
     pub fn clearScreen(self: Backend) Error!void {
         return self.vtable.clear_screen(self.ptr);
     }
 
-    /// Write data to terminal
     pub fn write(self: Backend, data: []const u8) Error!void {
         return self.vtable.write(self.ptr, data);
     }
 
-    /// Flush buffered output
     pub fn flush(self: Backend) Error!void {
         return self.vtable.flush(self.ptr);
     }
 
-    /// Get terminal size
     pub fn getSize(self: Backend) Error!render.Size {
         return self.vtable.get_size(self.ptr);
     }
 
-    /// Poll for events (timeout in milliseconds, 0 = non-blocking)
     pub fn pollEvent(self: Backend, timeout_ms: u32) Error!events.Event {
         return self.vtable.poll_event(self.ptr, timeout_ms);
     }
 
-    /// Hide cursor
     pub fn hideCursor(self: Backend) Error!void {
         return self.vtable.hide_cursor(self.ptr);
     }
 
-    /// Show cursor
     pub fn showCursor(self: Backend) Error!void {
         return self.vtable.show_cursor(self.ptr);
     }
 
-    /// Set cursor position
     pub fn setCursor(self: Backend, x: u16, y: u16) Error!void {
         return self.vtable.set_cursor(self.ptr, x, y);
     }
 
-    /// Enable a keyboard protocol (e.g. Kitty CSI u).
     pub fn enableKeyboardProtocol(self: Backend, options: KeyboardProtocolOptions) Error!void {
         return self.vtable.enable_keyboard_protocol(self.ptr, options);
     }
 
-    /// Disable the active keyboard protocol.
     pub fn disableKeyboardProtocol(self: Backend) Error!void {
         return self.vtable.disable_keyboard_protocol(self.ptr);
     }
 
-    /// Enable mouse event reporting.
     pub fn enableMouse(self: Backend) Error!void {
         return self.vtable.enable_mouse(self.ptr);
     }
 
-    /// Disable mouse event reporting.
     pub fn disableMouse(self: Backend) Error!void {
         return self.vtable.disable_mouse(self.ptr);
     }
@@ -150,11 +132,8 @@ pub const Backend = struct {
 pub const AnsiBackend = @import("ansi.zig").AnsiBackend;
 pub const WindowsBackend = @import("windows.zig").WindowsBackend;
 
-/// Native backend for the current platform (Windows or ANSI)
 pub const NativeBackend = if (@import("builtin").os.tag == .windows) WindowsBackend else AnsiBackend;
 
-/// Initialize the native backend for the current platform.
-/// This is a convenience function that automatically selects the correct backend.
 pub fn init(allocator: std.mem.Allocator) !NativeBackend {
     return NativeBackend.init(allocator);
 }

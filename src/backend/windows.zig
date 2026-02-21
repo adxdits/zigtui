@@ -1,5 +1,3 @@
-//! Windows console backend
-
 const std = @import("std");
 const builtin = @import("builtin");
 const Backend = @import("mod.zig").Backend;

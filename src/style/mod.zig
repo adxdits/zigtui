@@ -1,12 +1,8 @@
-//! Style module - Colors, modifiers, and styling
-
 const std = @import("std");
 
-/// Built-in themes
 pub const themes = @import("themes.zig");
 pub const Theme = themes.Theme;
 
-/// Color representation supporting various color modes
 pub const Color = union(enum) {
     reset,
     black,
@@ -35,19 +31,14 @@ pub const Color = union(enum) {
         b: u8,
     };
 
-    // Color constructor functions for convenience
-    pub fn reset_() Color { return .reset; }
-    pub fn black_() Color { return .black; }
-    pub fn red_() Color { return .red; }
-    pub fn green_() Color { return .green; }
-    pub fn yellow_() Color { return .yellow; }
-    pub fn blue_() Color { return .blue; }
-    pub fn magenta_() Color { return .magenta; }
-    pub fn cyan_() Color { return .cyan; }
-    pub fn white_() Color { return .white; }
-    pub fn gray_() Color { return .gray; }
+    pub fn fromRGB(r: u8, g: u8, b: u8) Color {
+        return .{ .rgb = .{ .r = r, .g = g, .b = b } };
+    }
 
-    /// Check if two colors are equal
+    pub fn fromIndex(idx: u8) Color {
+        return .{ .indexed = idx };
+    }
+
     pub fn eql(self: Color, other: Color) bool {
         if (@as(std.meta.Tag(Color), self) != @as(std.meta.Tag(Color), other)) {
             return false;
@@ -59,7 +50,6 @@ pub const Color = union(enum) {
         };
     }
 
-    /// Convert color to ANSI foreground code
     pub fn toFg(self: Color) []const u8 {
         return switch (self) {
             .reset => "\x1b[39m",
@@ -80,11 +70,10 @@ pub const Color = union(enum) {
             .light_magenta => "\x1b[95m",
             .light_cyan => "\x1b[96m",
             .light_white => "\x1b[97m",
-            .rgb, .indexed => "", // Requires formatting
+            .rgb, .indexed => "", // Use writeFg for these
         };
     }
 
-    /// Convert color to ANSI background code
     pub fn toBg(self: Color) []const u8 {
         return switch (self) {
             .reset => "\x1b[49m",
@@ -105,12 +94,29 @@ pub const Color = union(enum) {
             .light_magenta => "\x1b[105m",
             .light_cyan => "\x1b[106m",
             .light_white => "\x1b[107m",
-            .rgb, .indexed => "", // Requires formatting
+            .rgb, .indexed => "", // Use writeBg for these
         };
+    }
+
+    pub fn writeFg(self: Color, writer: anytype) !void {
+        switch (self) {
+            .rgb => |rgb| try writer.print("\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b }),
+            .indexed => |idx| try writer.print("\x1b[38;5;{d}m", .{idx}),
+            .reset => {},
+            else => try writer.writeAll(self.toFg()),
+        }
+    }
+
+    pub fn writeBg(self: Color, writer: anytype) !void {
+        switch (self) {
+            .rgb => |rgb| try writer.print("\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b }),
+            .indexed => |idx| try writer.print("\x1b[48;5;{d}m", .{idx}),
+            .reset => {},
+            else => try writer.writeAll(self.toBg()),
+        }
     }
 };
 
-/// Text modifiers (bold, italic, etc.)
 pub const Modifier = packed struct {
     bold: bool = false,
     dim: bool = false,
@@ -129,22 +135,18 @@ pub const Modifier = packed struct {
     pub const UNDERLINED = Modifier{ .underlined = true };
     pub const REVERSED = Modifier{ .reversed = true };
 
-    /// Check if two modifiers are equal
     pub fn eql(self: Modifier, other: Modifier) bool {
         return @as(u9, @bitCast(self)) == @as(u9, @bitCast(other));
     }
 
-    /// Merge two modifiers (OR operation)
     pub fn merge(self: Modifier, other: Modifier) Modifier {
         return @bitCast(@as(u9, @bitCast(self)) | @as(u9, @bitCast(other)));
     }
 
-    /// Check if modifier is empty
     pub fn isEmpty(self: Modifier) bool {
         return @as(u9, @bitCast(self)) == 0;
     }
 
-    /// Get ANSI codes for modifier
     pub fn toAnsi(self: Modifier, writer: anytype) !void {
         if (self.bold) try writer.writeAll("\x1b[1m");
         if (self.dim) try writer.writeAll("\x1b[2m");
@@ -158,7 +160,6 @@ pub const Modifier = packed struct {
     }
 };
 
-/// Style combining foreground, background, and modifiers
 pub const Style = struct {
     fg: ?Color = null,
     bg: ?Color = null,
@@ -166,7 +167,6 @@ pub const Style = struct {
 
     pub const DEFAULT = Style{};
 
-    /// Merge two styles (other takes precedence)
     pub fn merge(self: Style, other: Style) Style {
         return .{
             .fg = other.fg orelse self.fg,
@@ -175,17 +175,14 @@ pub const Style = struct {
         };
     }
 
-    /// Create style with foreground color
     pub fn fgColor(color: Color) Style {
         return .{ .fg = color };
     }
 
-    /// Create style with background color
     pub fn bgColor(color: Color) Style {
         return .{ .bg = color };
     }
 
-    /// Add modifier to style
     pub fn addModifier(self: Style, mod: Modifier) Style {
         return .{
             .fg = self.fg,
@@ -194,7 +191,6 @@ pub const Style = struct {
         };
     }
 
-    /// Reset all styles
     pub fn reset(writer: anytype) !void {
         try writer.writeAll("\x1b[0m");
     }
@@ -205,11 +201,11 @@ test "Color equality" {
     const blue: Color = .blue;
     try std.testing.expect(red.eql(.red));
     try std.testing.expect(!red.eql(blue));
-    
+
     const rgb1 = Color{ .rgb = .{ .r = 255, .g = 0, .b = 0 } };
     const rgb2 = Color{ .rgb = .{ .r = 255, .g = 0, .b = 0 } };
     const rgb3 = Color{ .rgb = .{ .r = 0, .g = 255, .b = 0 } };
-    
+
     try std.testing.expect(rgb1.eql(rgb2));
     try std.testing.expect(!rgb1.eql(rgb3));
 }
@@ -218,7 +214,7 @@ test "Modifier operations" {
     const m1 = Modifier.BOLD;
     const m2 = Modifier.ITALIC;
     const merged = m1.merge(m2);
-    
+
     try std.testing.expect(merged.bold);
     try std.testing.expect(merged.italic);
     try std.testing.expect(!merged.underlined);
@@ -228,7 +224,7 @@ test "Style merging" {
     const s1 = Style{ .fg = .red, .modifier = Modifier.BOLD };
     const s2 = Style{ .bg = .blue, .modifier = Modifier.ITALIC };
     const merged = s1.merge(s2);
-    
+
     try std.testing.expect(merged.fg.?.eql(Color.red));
     try std.testing.expect(merged.bg.?.eql(Color.blue));
     try std.testing.expect(merged.modifier.bold);

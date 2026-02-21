@@ -1,5 +1,3 @@
-//! Gauge widget - progress bar
-
 const std = @import("std");
 const render = @import("../render/mod.zig");
 const style = @import("../style/mod.zig");
@@ -8,7 +6,6 @@ const Buffer = render.Buffer;
 const Style = style.Style;
 
 pub const Gauge = struct {
-    /// Progress ratio from 0.0 to 1.0
     ratio: f64,
     label: ?[]const u8 = null,
     style: Style = .{},
@@ -54,7 +51,6 @@ pub const Gauge = struct {
         }
     }
 
-    /// Create gauge with percentage
     pub fn percent(pct: u8) Gauge {
         return .{
             .ratio = @as(f64, @floatFromInt(@min(pct, 100))) / 100.0,
@@ -62,7 +58,6 @@ pub const Gauge = struct {
     }
 };
 
-/// Line gauge - single line progress indicator
 pub const LineGauge = struct {
     ratio: f64,
     label: ?[]const u8 = null,

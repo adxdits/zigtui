@@ -1,7 +1,3 @@
-//! ZigTUI Themes Demo
-//! Showcases all built-in themes with live preview
-//! Controls: Up/Down to switch themes, 'q' to quit
-
 const std = @import("std");
 const tui = @import("zigtui");
 

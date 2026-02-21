@@ -1,19 +1,12 @@
-//! Kitty Graphics Protocol Implementation
-//! Supports displaying images in terminals with Kitty Graphics support
-//! Reference: https://sw.kovidgoyal.net/kitty/graphics-protocol/
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const backend = @import("../backend/mod.zig");
 const render = @import("../render/mod.zig");
 
-/// Standard Base64 encoder for Kitty protocol
 const base64_encoder = std.base64.standard.Encoder;
 
-/// Maximum chunk size for base64-encoded data (4096 bytes is safe for most terminals)
 pub const MAX_CHUNK_SIZE: usize = 4096;
 
-/// Image format types supported by Kitty
 pub const Format = enum(u8) {
     rgba = 32, // 32-bit RGBA
     rgb = 24, // 24-bit RGB
@@ -24,27 +17,17 @@ pub const Format = enum(u8) {
     }
 };
 
-/// Image placement options
 pub const Placement = struct {
-    /// X position in cells (default: cursor position)
     x: ?u16 = null,
-    /// Y position in cells (default: cursor position)
     y: ?u16 = null,
-    /// Width in cells (default: auto)
     width: ?u16 = null,
-    /// Height in cells (default: auto)
     height: ?u16 = null,
-    /// Z-index for layering
     z_index: i32 = 0,
-    /// Image ID for later reference
     image_id: ?u32 = null,
-    /// Placement ID for later reference
     placement_id: ?u32 = null,
-    /// Whether to move cursor after placement
     move_cursor: bool = false,
 };
 
-/// Actions for image commands
 pub const Action = enum(u8) {
     transmit = 't', // Transmit image data
     transmit_and_display = 'T', // Transmit and display immediately
@@ -55,7 +38,6 @@ pub const Action = enum(u8) {
     animation_control = 'a', // Animation control
 };
 
-/// Delete targets for image deletion
 pub const DeleteTarget = enum {
     all, // Delete all images
     by_id, // Delete by image ID
@@ -64,25 +46,19 @@ pub const DeleteTarget = enum {
     in_range, // Delete in cell range
 };
 
-/// Kitty Graphics capability detection result
 pub const Capability = struct {
     supported: bool = false,
-    /// Terminal responded to query
     responded: bool = false,
-    /// Error message if any
     error_msg: ?[]const u8 = null,
 };
 
-/// Image data wrapper
 pub const Image = struct {
     data: []const u8,
     width: u32,
     height: u32,
     format: Format,
-    /// Number of bytes per pixel
     stride: u32,
 
-    /// Create an image from raw RGBA data
     pub fn fromRGBA(data: []const u8, width: u32, height: u32) Image {
         return .{
             .data = data,
@@ -93,7 +69,6 @@ pub const Image = struct {
         };
     }
 
-    /// Create an image from raw RGB data
     pub fn fromRGB(data: []const u8, width: u32, height: u32) Image {
         return .{
             .data = data,
@@ -104,7 +79,6 @@ pub const Image = struct {
         };
     }
 
-    /// Create an image from PNG data
     pub fn fromPNG(data: []const u8) Image {
         return .{
             .data = data,
@@ -116,16 +90,11 @@ pub const Image = struct {
     }
 };
 
-/// Kitty Graphics renderer
 pub const KittyGraphics = struct {
     allocator: Allocator,
-    /// Whether Kitty graphics is supported
     supported: bool = false,
-    /// Whether detection has been performed
     detected: bool = false,
-    /// Output buffer for escape sequences
     output_buffer: std.ArrayListUnmanaged(u8) = .empty,
-    /// Next image ID to assign
     next_image_id: u32 = 1,
 
     pub fn init(allocator: Allocator) KittyGraphics {
@@ -138,66 +107,40 @@ pub const KittyGraphics = struct {
         self.output_buffer.deinit(self.allocator);
     }
 
-    /// Build the Kitty graphics escape sequence header
-    fn writeHeader(self: *KittyGraphics, params: anytype) !void {
-        try self.output_buffer.appendSlice(self.allocator, "\x1b_G");
+    // ── Helpers for building escape sequences ────────────────────────
 
-        var first = true;
-        inline for (std.meta.fields(@TypeOf(params))) |field| {
-            const value = @field(params, field.name);
-            const has_value = switch (@typeInfo(field.type)) {
-                .optional => value != null,
-                else => true,
-            };
-
-            if (has_value) {
-                if (!first) {
-                    try self.output_buffer.append(self.allocator, ',');
-                }
-                first = false;
-
-                const actual_value = switch (@typeInfo(field.type)) {
-                    .optional => value.?,
-                    else => value,
-                };
-
-                try self.output_buffer.appendSlice(self.allocator, field.name);
-                try self.output_buffer.append(self.allocator, '=');
-
-                switch (@typeInfo(@TypeOf(actual_value))) {
-                    .@"enum" => {
-                        try self.output_buffer.append(self.allocator, @intFromEnum(actual_value));
-                    },
-                    .int, .comptime_int => {
-                        var buf: [20]u8 = undefined;
-                        const str = std.fmt.bufPrint(&buf, "{d}", .{actual_value}) catch unreachable;
-                        try self.output_buffer.appendSlice(self.allocator, str);
-                    },
-                    else => {
-                        try self.output_buffer.appendSlice(self.allocator, actual_value);
-                    },
-                }
-            }
-        }
+    fn appendParam(self: *KittyGraphics, key: []const u8, value: anytype) !void {
+        const alloc = self.allocator;
+        try self.output_buffer.appendSlice(alloc, key);
+        var buf: [20]u8 = undefined;
+        const str = std.fmt.bufPrint(&buf, "{d}", .{value}) catch unreachable;
+        try self.output_buffer.appendSlice(alloc, str);
     }
 
-    /// Write chunked base64 data with proper escape sequences
-    fn writeChunkedData(self: *KittyGraphics, data: []const u8, params: struct {
-        a: Action = .transmit_and_display,
-        f: Format = .rgba,
-        s: ?u32 = null, // width
-        v: ?u32 = null, // height
-        i: ?u32 = null, // image id
-        p: ?u32 = null, // placement id
-        x: ?u16 = null, // x position
-        y: ?u16 = null, // y position
-        c: ?u16 = null, // columns
-        r: ?u16 = null, // rows
-        z: ?i32 = null, // z-index
-        C: ?u8 = null, // do not move cursor (1)
-    }) !void {
+    fn appendOptParam(self: *KittyGraphics, key: []const u8, maybe: anytype) !void {
+        if (maybe) |v| try self.appendParam(key, v);
+    }
+
+    fn writeChunkedData(
+        self: *KittyGraphics,
+        data: []const u8,
+        params: struct {
+            a: Action = .transmit_and_display,
+            f: Format = .rgba,
+            s: ?u32 = null, // width
+            v: ?u32 = null, // height
+            i: ?u32 = null, // image id
+            p: ?u32 = null, // placement id
+            x: ?u16 = null, // x position
+            y: ?u16 = null, // y position
+            c: ?u16 = null, // columns
+            r: ?u16 = null, // rows
+            z: ?i32 = null, // z-index
+            C: ?u8 = null, // do not move cursor (1)
+        },
+    ) !void {
         const alloc = self.allocator;
-        
+
         // Calculate base64 encoded size
         const encoded_len = base64_encoder.calcSize(data.len);
 
@@ -225,61 +168,17 @@ pub const KittyGraphics = struct {
                 try self.output_buffer.append(alloc, '=');
                 try self.output_buffer.append(alloc, @intFromEnum(params.a));
 
-                try self.output_buffer.appendSlice(alloc, ",f=");
-                var buf: [10]u8 = undefined;
-                const f_str = std.fmt.bufPrint(&buf, "{d}", .{params.f.toCode()}) catch unreachable;
-                try self.output_buffer.appendSlice(alloc, f_str);
-
-                if (params.s) |s| {
-                    try self.output_buffer.appendSlice(alloc, ",s=");
-                    const s_str = std.fmt.bufPrint(&buf, "{d}", .{s}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, s_str);
-                }
-                if (params.v) |v| {
-                    try self.output_buffer.appendSlice(alloc, ",v=");
-                    const v_str = std.fmt.bufPrint(&buf, "{d}", .{v}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, v_str);
-                }
-                if (params.i) |i| {
-                    try self.output_buffer.appendSlice(alloc, ",i=");
-                    const i_str = std.fmt.bufPrint(&buf, "{d}", .{i}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, i_str);
-                }
-                if (params.p) |p| {
-                    try self.output_buffer.appendSlice(alloc, ",p=");
-                    const p_str = std.fmt.bufPrint(&buf, "{d}", .{p}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, p_str);
-                }
-                if (params.x) |x| {
-                    try self.output_buffer.appendSlice(alloc, ",x=");
-                    const x_str = std.fmt.bufPrint(&buf, "{d}", .{x}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, x_str);
-                }
-                if (params.y) |y| {
-                    try self.output_buffer.appendSlice(alloc, ",y=");
-                    const y_str = std.fmt.bufPrint(&buf, "{d}", .{y}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, y_str);
-                }
-                if (params.c) |c| {
-                    try self.output_buffer.appendSlice(alloc, ",c=");
-                    const c_str = std.fmt.bufPrint(&buf, "{d}", .{c}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, c_str);
-                }
-                if (params.r) |r| {
-                    try self.output_buffer.appendSlice(alloc, ",r=");
-                    const r_str = std.fmt.bufPrint(&buf, "{d}", .{r}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, r_str);
-                }
-                if (params.z) |z| {
-                    try self.output_buffer.appendSlice(alloc, ",z=");
-                    const z_str = std.fmt.bufPrint(&buf, "{d}", .{z}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, z_str);
-                }
-                if (params.C) |c_val| {
-                    try self.output_buffer.appendSlice(alloc, ",C=");
-                    const c_str = std.fmt.bufPrint(&buf, "{d}", .{c_val}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, c_str);
-                }
+                try self.appendParam(",f=", params.f.toCode());
+                try self.appendOptParam(",s=", params.s);
+                try self.appendOptParam(",v=", params.v);
+                try self.appendOptParam(",i=", params.i);
+                try self.appendOptParam(",p=", params.p);
+                try self.appendOptParam(",x=", params.x);
+                try self.appendOptParam(",y=", params.y);
+                try self.appendOptParam(",c=", params.c);
+                try self.appendOptParam(",r=", params.r);
+                try self.appendOptParam(",z=", params.z);
+                try self.appendOptParam(",C=", params.C);
 
                 is_first = false;
             }
@@ -299,7 +198,6 @@ pub const KittyGraphics = struct {
         }
     }
 
-    /// Display an image at the specified position
     pub fn drawImage(
         self: *KittyGraphics,
         image: Image,
@@ -331,7 +229,6 @@ pub const KittyGraphics = struct {
         return self.output_buffer.items;
     }
 
-    /// Transmit an image without displaying it (for later placement)
     pub fn transmitImage(
         self: *KittyGraphics,
         image: Image,
@@ -357,7 +254,6 @@ pub const KittyGraphics = struct {
         return self.output_buffer.items;
     }
 
-    /// Place a previously transmitted image
     pub fn placeImage(
         self: *KittyGraphics,
         image_id: u32,
@@ -367,42 +263,14 @@ pub const KittyGraphics = struct {
         self.output_buffer.clearRetainingCapacity();
 
         try self.output_buffer.appendSlice(alloc, "\x1b_Ga=p");
-
-        var buf: [20]u8 = undefined;
-
-        try self.output_buffer.appendSlice(alloc, ",i=");
-        const i_str = std.fmt.bufPrint(&buf, "{d}", .{image_id}) catch unreachable;
-        try self.output_buffer.appendSlice(alloc, i_str);
-
-        if (placement.placement_id) |p| {
-            try self.output_buffer.appendSlice(alloc, ",p=");
-            const p_str = std.fmt.bufPrint(&buf, "{d}", .{p}) catch unreachable;
-            try self.output_buffer.appendSlice(alloc, p_str);
-        }
-        if (placement.x) |x| {
-            try self.output_buffer.appendSlice(alloc, ",x=");
-            const x_str = std.fmt.bufPrint(&buf, "{d}", .{x}) catch unreachable;
-            try self.output_buffer.appendSlice(alloc, x_str);
-        }
-        if (placement.y) |y| {
-            try self.output_buffer.appendSlice(alloc, ",y=");
-            const y_str = std.fmt.bufPrint(&buf, "{d}", .{y}) catch unreachable;
-            try self.output_buffer.appendSlice(alloc, y_str);
-        }
-        if (placement.width) |c| {
-            try self.output_buffer.appendSlice(alloc, ",c=");
-            const c_str = std.fmt.bufPrint(&buf, "{d}", .{c}) catch unreachable;
-            try self.output_buffer.appendSlice(alloc, c_str);
-        }
-        if (placement.height) |r| {
-            try self.output_buffer.appendSlice(alloc, ",r=");
-            const r_str = std.fmt.bufPrint(&buf, "{d}", .{r}) catch unreachable;
-            try self.output_buffer.appendSlice(alloc, r_str);
-        }
+        try self.appendParam(",i=", image_id);
+        try self.appendOptParam(",p=", placement.placement_id);
+        try self.appendOptParam(",x=", placement.x);
+        try self.appendOptParam(",y=", placement.y);
+        try self.appendOptParam(",c=", placement.width);
+        try self.appendOptParam(",r=", placement.height);
         if (placement.z_index != 0) {
-            try self.output_buffer.appendSlice(alloc, ",z=");
-            const z_str = std.fmt.bufPrint(&buf, "{d}", .{placement.z_index}) catch unreachable;
-            try self.output_buffer.appendSlice(alloc, z_str);
+            try self.appendParam(",z=", placement.z_index);
         }
         if (!placement.move_cursor) {
             try self.output_buffer.appendSlice(alloc, ",C=1");
@@ -413,7 +281,6 @@ pub const KittyGraphics = struct {
         return self.output_buffer.items;
     }
 
-    /// Delete images
     pub fn deleteImages(
         self: *KittyGraphics,
         target: DeleteTarget,
@@ -428,21 +295,11 @@ pub const KittyGraphics = struct {
             .all => try self.output_buffer.appendSlice(alloc, ",d=A"),
             .by_id => {
                 try self.output_buffer.appendSlice(alloc, ",d=I");
-                if (id) |i| {
-                    var buf: [20]u8 = undefined;
-                    try self.output_buffer.appendSlice(alloc, ",i=");
-                    const i_str = std.fmt.bufPrint(&buf, "{d}", .{i}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, i_str);
-                }
+                try self.appendOptParam(",i=", id);
             },
             .by_placement => {
                 try self.output_buffer.appendSlice(alloc, ",d=P");
-                if (id) |p| {
-                    var buf: [20]u8 = undefined;
-                    try self.output_buffer.appendSlice(alloc, ",p=");
-                    const p_str = std.fmt.bufPrint(&buf, "{d}", .{p}) catch unreachable;
-                    try self.output_buffer.appendSlice(alloc, p_str);
-                }
+                try self.appendOptParam(",p=", id);
             },
             .at_cursor => try self.output_buffer.appendSlice(alloc, ",d=C"),
             .in_range => try self.output_buffer.appendSlice(alloc, ",d=R"),
@@ -453,7 +310,6 @@ pub const KittyGraphics = struct {
         return self.output_buffer.items;
     }
 
-    /// Generate escape sequence to query Kitty graphics support
     pub fn querySupport(self: *KittyGraphics) ![]const u8 {
         self.output_buffer.clearRetainingCapacity();
         // Query with a minimal 1x1 transparent pixel
@@ -462,7 +318,6 @@ pub const KittyGraphics = struct {
         return self.output_buffer.items;
     }
 
-    /// Check if terminal response indicates Kitty graphics support
     pub fn parseQueryResponse(response: []const u8) Capability {
         // Look for Kitty graphics response pattern: \x1b_Gi=31;OK\x1b\
         // or error response: \x1b_Gi=31;error message\x1b\
@@ -485,7 +340,6 @@ pub const KittyGraphics = struct {
         return cap;
     }
 
-    /// Generate a simple test pattern image (8x8 checkerboard)
     pub fn generateTestPattern(self: *KittyGraphics) !Image {
         const size: u32 = 8;
         const data = try self.allocator.alloc(u8, size * size * 4);
@@ -511,13 +365,11 @@ pub const KittyGraphics = struct {
         };
     }
 
-    /// Free image data allocated by generateTestPattern
     pub fn freeImageData(self: *KittyGraphics, image: Image) void {
         self.allocator.free(image.data);
     }
 };
 
-/// Create a solid color image
 pub fn createSolidImage(allocator: Allocator, width: u32, height: u32, r: u8, g: u8, b: u8, a: u8) !Image {
     const data = try allocator.alloc(u8, @as(usize, width) * @as(usize, height) * 4);
 
@@ -538,7 +390,6 @@ pub fn createSolidImage(allocator: Allocator, width: u32, height: u32, r: u8, g:
     };
 }
 
-/// Free image data
 pub fn freeImage(allocator: Allocator, image: Image) void {
     allocator.free(image.data);
 }

@@ -1,6 +1,3 @@
-//! Mouse input demo
-//! Controls: click/scroll/move the mouse, 'q' to quit
-
 const std = @import("std");
 const tui = @import("zigtui");
 

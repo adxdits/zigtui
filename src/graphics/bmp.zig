@@ -1,6 +1,3 @@
-//! Simple BMP image decoder
-//! Supports 24-bit and 32-bit uncompressed BMP files
-
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
@@ -12,7 +9,6 @@ pub const BmpError = error{
     OutOfMemory,
 };
 
-/// Decoded BMP image
 pub const BmpImage = struct {
     data: []u8,
     width: u32,
@@ -24,8 +20,6 @@ pub const BmpImage = struct {
     }
 };
 
-/// Decode a BMP file from raw bytes
-/// Returns RGBA pixel data (top-to-bottom, left-to-right)
 pub fn decode(allocator: Allocator, file_data: []const u8) !BmpImage {
     if (file_data.len < 54) {
         return BmpError.FileTooSmall;
@@ -109,7 +103,6 @@ pub fn decode(allocator: Allocator, file_data: []const u8) !BmpImage {
     };
 }
 
-/// Load and decode a BMP file from disk
 pub fn loadFile(allocator: Allocator, path: []const u8) !BmpImage {
     const file = try std.fs.cwd().openFile(path, .{});
     defer file.close();

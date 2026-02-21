@@ -1,5 +1,3 @@
-//! List widget - scrollable list of items
-
 const std = @import("std");
 const render = @import("../render/mod.zig");
 const style = @import("../style/mod.zig");
@@ -18,7 +16,6 @@ pub const List = struct {
     highlight_style: Style = .{},
     highlight_symbol: []const u8 = "> ",
     selected: ?usize = null,
-    /// Start index for scrolling
     offset: usize = 0,
 
     pub fn render(self: List, area: Rect, buf: *Buffer) void {
@@ -74,7 +71,6 @@ pub const List = struct {
         }
     }
 
-    /// Select next item
     pub fn selectNext(self: *List) void {
         if (self.items.len == 0) return;
         
@@ -87,7 +83,6 @@ pub const List = struct {
         }
     }
 
-    /// Select previous item
     pub fn selectPrevious(self: *List) void {
         if (self.items.len == 0) return;
         
@@ -100,7 +95,6 @@ pub const List = struct {
         }
     }
 
-    /// Ensure selected item is visible (adjust offset)
     pub fn scrollToSelected(self: *List, visible_height: usize) void {
         if (self.selected) |sel| {
             // Scroll down if selected is below visible area
