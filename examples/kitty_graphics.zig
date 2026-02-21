@@ -1,12 +1,3 @@
-//! ZigTUI Kitty Graphics Example
-//! Demonstrates displaying images in terminals with Kitty Graphics protocol support
-//! Controls: 'q' to quit, 'r' to refresh, 't' to toggle between image and fallback
-//!
-//! This example shows:
-//! - Detecting Kitty Graphics support
-//! - Displaying images using the Kitty protocol
-//! - Fallback to Unicode block characters for unsupported terminals
-
 const std = @import("std");
 const tui = @import("zigtui");
 
@@ -251,7 +242,6 @@ fn drawControls(buf: *Buffer, area: Rect) void {
     buf.setString(x, y, "]oggle Fallback", help_style);
 }
 
-/// Generate a gradient test image
 fn generateGradientImage(allocator: std.mem.Allocator, width: u32, height: u32) !Image {
     const data = try allocator.alloc(u8, @as(usize, width) * @as(usize, height) * 4);
 
@@ -280,7 +270,6 @@ fn generateGradientImage(allocator: std.mem.Allocator, width: u32, height: u32) 
     };
 }
 
-/// Load demo.bmp from the examples directory (BMP format for easy decoding)
 fn loadDemoImage(allocator: std.mem.Allocator) !Image {
     // Try to find demo.bmp relative to executable or in examples folder
     const paths = [_][]const u8{

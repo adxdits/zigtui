@@ -1,5 +1,3 @@
-//! Widget types and rendering
-
 const std = @import("std");
 const render = @import("../render/mod.zig");
 const style = @import("../style/mod.zig");
@@ -7,7 +5,6 @@ const Rect = render.Rect;
 const Buffer = render.Buffer;
 const Style = style.Style;
 
-/// Widget trait - all widgets implement this interface
 pub const Widget = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
@@ -21,7 +18,6 @@ pub const Widget = struct {
     }
 };
 
-/// Border flags
 pub const Borders = packed struct {
     top: bool = false,
     bottom: bool = false,
@@ -44,7 +40,6 @@ pub const Borders = packed struct {
     }
 };
 
-/// Block widget - container with borders and title
 pub const Block = struct {
     title: ?[]const u8 = null,
     borders: Borders = Borders.NONE,
@@ -130,7 +125,6 @@ pub const Block = struct {
         }
     }
 
-    /// Get inner area (excluding borders)
     pub fn inner(self: Block, area: Rect) Rect {
         var inner_area = area;
 
@@ -153,7 +147,6 @@ pub const Block = struct {
     }
 };
 
-/// Border symbols
 pub const BorderSymbols = struct {
     top_left: u21,
     top_right: u21,
@@ -162,7 +155,6 @@ pub const BorderSymbols = struct {
     horizontal: u21,
     vertical: u21,
 
-    /// ASCII borders - works on all terminals including Windows
     pub fn default() BorderSymbols {
         return .{
             .top_left = '+',
@@ -174,7 +166,6 @@ pub const BorderSymbols = struct {
         };
     }
 
-    /// Unicode line drawing borders
     pub fn line() BorderSymbols {
         return .{
             .top_left = 0x250C, // ┌
@@ -209,52 +200,6 @@ pub const BorderSymbols = struct {
     }
 };
 
-/// Paragraph widget - multi-line text
-pub const Paragraph = struct {
-    text: []const u8,
-    style: Style = .{},
-    wrap: bool = true,
-
-    pub fn render(self: Paragraph, area: Rect, buf: *Buffer) void {
-        if (area.width == 0 or area.height == 0) return;
-
-        var y_offset: u16 = 0;
-        var x_offset: u16 = 0;
-        var view = std.unicode.Utf8View.initUnchecked(self.text);
-        var iter = view.iterator();
-
-        while (iter.nextCodepoint()) |codepoint| {
-            if (y_offset >= area.height) break;
-
-            if (codepoint == '\n') {
-                y_offset += 1;
-                x_offset = 0;
-                continue;
-            }
-
-            if (x_offset >= area.width) {
-                if (self.wrap) {
-                    y_offset += 1;
-                    x_offset = 0;
-                } else {
-                    // Skip to next line
-                    while (iter.nextCodepoint()) |c| {
-                        if (c == '\n') break;
-                    }
-                    y_offset += 1;
-                    x_offset = 0;
-                    continue;
-                }
-            }
-
-            if (y_offset < area.height) {
-                buf.setChar(area.x + x_offset, area.y + y_offset, codepoint, self.style);
-                x_offset += 1;
-            }
-        }
-    }
-};
-
 test "Block inner area calculation" {
     const block = Block{ .borders = Borders.ALL };
     const area = Rect{ .x = 0, .y = 0, .width = 10, .height = 10 };
@@ -267,6 +212,8 @@ test "Block inner area calculation" {
 }
 
 // Re-export widget types
+pub const Paragraph = @import("paragraph.zig").Paragraph;
+pub const ImageWidget = @import("image.zig").ImageWidget;
 pub const List = @import("list.zig").List;
 pub const ListItem = @import("list.zig").ListItem;
 pub const Gauge = @import("gauge.zig").Gauge;

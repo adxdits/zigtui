@@ -1,6 +1,3 @@
-//! Dashboard demo
-//! Controls: Tab to switch panels, Arrow keys to navigate, 'q' to quit
-
 const std = @import("std");
 const tui = @import("zigtui");
 

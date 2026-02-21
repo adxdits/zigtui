@@ -1,8 +1,5 @@
-//! Input event types
-
 const std = @import("std");
 
-/// Key modifiers (Ctrl, Alt, Shift, Meta)
 pub const KeyModifiers = packed struct {
     shift: bool = false,
     ctrl: bool = false,
@@ -19,7 +16,6 @@ pub const KeyModifiers = packed struct {
     pub const ALT = KeyModifiers{ .alt = true };
 };
 
-/// Key codes for keyboard input
 pub const KeyCode = union(enum) {
     char: u21,
     f: u8, // F1-F35
@@ -46,41 +42,34 @@ pub const KeyCode = union(enum) {
     pause,
     menu,
 
-    /// Common key codes
     pub fn from_char(c: u21) KeyCode {
         return .{ .char = c };
     }
 };
 
-/// Key event type
 pub const KeyEventKind = enum {
     press,
     repeat,
     release,
 };
 
-/// Keyboard event
 pub const KeyEvent = struct {
     code: KeyCode,
     modifiers: KeyModifiers = .{},
     kind: KeyEventKind = .press,
 
-    /// Check if Ctrl is pressed
     pub fn isCtrl(self: KeyEvent) bool {
         return self.modifiers.ctrl;
     }
 
-    /// Check if Alt is pressed
     pub fn isAlt(self: KeyEvent) bool {
         return self.modifiers.alt;
     }
 
-    /// Check if Shift is pressed
     pub fn isShift(self: KeyEvent) bool {
         return self.modifiers.shift;
     }
 
-    /// Check if this is a character key
     pub fn isChar(self: KeyEvent, c: u21) bool {
         return switch (self.code) {
             .char => |ch| ch == c,
@@ -89,14 +78,12 @@ pub const KeyEvent = struct {
     }
 };
 
-/// Mouse button
 pub const MouseButton = enum {
     left,
     right,
     middle,
 };
 
-/// Mouse event type
 pub const MouseEventKind = enum {
     down,
     up,
@@ -106,7 +93,6 @@ pub const MouseEventKind = enum {
     scroll_down,
 };
 
-/// Mouse event
 pub const MouseEvent = struct {
     kind: MouseEventKind,
     button: MouseButton,
@@ -115,7 +101,6 @@ pub const MouseEvent = struct {
     modifiers: KeyModifiers = .{},
 };
 
-/// Terminal event
 pub const Event = union(enum) {
     key: KeyEvent,
     mouse: MouseEvent,
@@ -125,7 +110,6 @@ pub const Event = union(enum) {
     paste: []const u8,
     none,
 
-    /// Check if this is a key event with specific character
     pub fn isChar(self: Event, c: u21) bool {
         return switch (self) {
             .key => |key| key.isChar(c),
@@ -133,7 +117,6 @@ pub const Event = union(enum) {
         };
     }
 
-    /// Check if this is a key event with specific code
     pub fn isKey(self: Event, code: KeyCode) bool {
         return switch (self) {
             .key => |key| std.meta.eql(key.code, code),
@@ -141,7 +124,6 @@ pub const Event = union(enum) {
         };
     }
 
-    /// Check if this is a resize event
     pub fn isResize(self: Event) bool {
         return self == .resize;
     }
@@ -152,7 +134,7 @@ test "KeyEvent creation" {
         .code = .{ .char = 'a' },
         .modifiers = .{ .ctrl = true },
     };
-    
+
     try std.testing.expect(key.isCtrl());
     try std.testing.expect(!key.isAlt());
     try std.testing.expect(key.isChar('a'));

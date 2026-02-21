@@ -1,5 +1,3 @@
-//! ANSI input parsing helpers (legacy + Kitty CSI u)
-
 const std = @import("std");
 const events = @import("../events/mod.zig");
 

@@ -1,118 +1,93 @@
-//! Built-in color themes
-
 const style = @import("mod.zig");
 const Color = style.Color;
 const Style = style.Style;
 const Modifier = style.Modifier;
 
-/// A complete theme definition with all semantic colors
 pub const Theme = struct {
-    /// Theme metadata
     name: []const u8,
     description: []const u8,
 
-    /// Base colors
     background: Color,
     foreground: Color,
 
-    /// Primary accent colors
     primary: Color,
     secondary: Color,
     accent: Color,
 
-    /// Semantic colors
     success: Color,
     warning: Color,
     error_color: Color,
     info: Color,
 
-    /// UI element colors
     border: Color,
     border_focused: Color,
     selection: Color,
     highlight: Color,
 
-    /// Text colors
     text: Color,
     text_muted: Color,
     text_inverted: Color,
 
-    /// Get style for primary elements (buttons, active items)
     pub fn primaryStyle(self: Theme) Style {
         return Style{ .fg = self.primary };
     }
 
-    /// Get style for secondary elements
     pub fn secondaryStyle(self: Theme) Style {
         return Style{ .fg = self.secondary };
     }
 
-    /// Get style for accent/highlighted elements
     pub fn accentStyle(self: Theme) Style {
         return Style{ .fg = self.accent };
     }
 
-    /// Get style for success messages/indicators
     pub fn successStyle(self: Theme) Style {
         return Style{ .fg = self.success };
     }
 
-    /// Get style for warning messages/indicators
     pub fn warningStyle(self: Theme) Style {
         return Style{ .fg = self.warning };
     }
 
-    /// Get style for error messages/indicators
     pub fn errorStyle(self: Theme) Style {
         return Style{ .fg = self.error_color };
     }
 
-    /// Get style for info messages
     pub fn infoStyle(self: Theme) Style {
         return Style{ .fg = self.info };
     }
 
-    /// Get style for borders
     pub fn borderStyle(self: Theme) Style {
         return Style{ .fg = self.border };
     }
 
-    /// Get style for focused borders
     pub fn borderFocusedStyle(self: Theme) Style {
         return Style{ .fg = self.border_focused };
     }
 
-    /// Get style for selected items
     pub fn selectionStyle(self: Theme) Style {
         return Style{ .fg = self.text_inverted, .bg = self.selection };
     }
 
-    /// Get style for highlighted items (hover, current)
     pub fn highlightStyle(self: Theme) Style {
         return Style{ .fg = self.foreground, .bg = self.highlight };
     }
 
-    /// Get base text style
     pub fn textStyle(self: Theme) Style {
         return Style{ .fg = self.text };
     }
 
-    /// Get muted/dimmed text style
     pub fn textMutedStyle(self: Theme) Style {
         return Style{ .fg = self.text_muted };
     }
 
-    /// Get base style with background
     pub fn baseStyle(self: Theme) Style {
         return Style{ .fg = self.foreground, .bg = self.background };
     }
 
-    /// Get title style (bold primary)
     pub fn titleStyle(self: Theme) Style {
         return Style{ .fg = self.primary, .modifier = Modifier.BOLD };
     }
 
-    /// Create a block style configuration
     pub fn blockConfig(self: Theme, focused: bool) BlockStyle {
         return BlockStyle{
             .style = self.baseStyle(),
@@ -121,14 +96,12 @@ pub const Theme = struct {
         };
     }
 
-    /// Block style configuration helper
     pub const BlockStyle = struct {
         style: Style,
         border_style: Style,
         title_style: Style,
     };
 
-    /// Get a gauge/progress bar style based on percentage
     pub fn gaugeStyle(self: Theme, percent: u8) Style {
         if (percent >= 90) {
             return Style{ .fg = self.error_color };
@@ -139,7 +112,6 @@ pub const Theme = struct {
         }
     }
 
-    /// Get style for list items
     pub fn listItemStyle(self: Theme, selected: bool, focused: bool) Style {
         if (selected and focused) {
             return self.selectionStyle().addModifier(Modifier.BOLD);
@@ -150,12 +122,10 @@ pub const Theme = struct {
         }
     }
 
-    /// Get style for table headers
     pub fn tableHeaderStyle(self: Theme) Style {
         return Style{ .fg = self.primary, .modifier = Modifier.BOLD };
     }
 
-    /// Get style for table rows (alternating)
     pub fn tableRowStyle(self: Theme, row_index: usize, selected: bool) Style {
         if (selected) {
             return self.selectionStyle();
@@ -167,7 +137,6 @@ pub const Theme = struct {
     }
 };
 
-/// Default dark theme - balanced and easy on the eyes
 pub const default = Theme{
     .name = "Default",
     .description = "Balanced dark theme with cyan accents",
@@ -189,7 +158,6 @@ pub const default = Theme{
     .text_inverted = .white,
 };
 
-/// Nord theme - Arctic, north-bluish color palette
 pub const nord = Theme{
     .name = "Nord",
     .description = "Arctic, north-bluish color palette",
@@ -211,7 +179,6 @@ pub const nord = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 236, .g = 239, .b = 244 } },
 };
 
-/// Dracula theme - Dark theme with vibrant colors
 pub const dracula = Theme{
     .name = "Dracula",
     .description = "Dark theme with vibrant colors",
@@ -233,7 +200,6 @@ pub const dracula = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 248, .g = 248, .b = 242 } },
 };
 
-/// Monokai Pro theme - Refined Monokai colors
 pub const monokai = Theme{
     .name = "Monokai Pro",
     .description = "Refined Monokai color palette",
@@ -255,7 +221,6 @@ pub const monokai = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 252, .g = 252, .b = 250 } },
 };
 
-/// Gruvbox Dark theme - Retro groove color scheme
 pub const gruvbox_dark = Theme{
     .name = "Gruvbox Dark",
     .description = "Retro groove color scheme (dark)",
@@ -277,7 +242,6 @@ pub const gruvbox_dark = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 235, .g = 219, .b = 178 } },
 };
 
-/// Gruvbox Light theme - Retro groove color scheme (light variant)
 pub const gruvbox_light = Theme{
     .name = "Gruvbox Light",
     .description = "Retro groove color scheme (light)",
@@ -299,7 +263,6 @@ pub const gruvbox_light = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 251, .g = 241, .b = 199 } },
 };
 
-/// Solarized Dark theme - Precision colors for machines and people
 pub const solarized_dark = Theme{
     .name = "Solarized Dark",
     .description = "Precision colors for machines and people (dark)",
@@ -321,7 +284,6 @@ pub const solarized_dark = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 253, .g = 246, .b = 227 } },
 };
 
-/// Solarized Light theme - Precision colors (light variant)
 pub const solarized_light = Theme{
     .name = "Solarized Light",
     .description = "Precision colors for machines and people (light)",
@@ -343,7 +305,6 @@ pub const solarized_light = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 0, .g = 43, .b = 54 } },
 };
 
-/// Tokyo Night theme - Clean dark theme inspired by Tokyo city lights
 pub const tokyo_night = Theme{
     .name = "Tokyo Night",
     .description = "Clean dark theme inspired by Tokyo city lights",
@@ -365,7 +326,6 @@ pub const tokyo_night = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 192, .g = 202, .b = 245 } },
 };
 
-/// Catppuccin Mocha theme - Soothing pastel theme (dark)
 pub const catppuccin_mocha = Theme{
     .name = "Catppuccin Mocha",
     .description = "Soothing pastel theme for the high-spirited",
@@ -387,7 +347,6 @@ pub const catppuccin_mocha = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 205, .g = 214, .b = 244 } },
 };
 
-/// Catppuccin Latte theme - Soothing pastel theme (light)
 pub const catppuccin_latte = Theme{
     .name = "Catppuccin Latte",
     .description = "Soothing pastel theme (light variant)",
@@ -409,7 +368,6 @@ pub const catppuccin_latte = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 239, .g = 241, .b = 245 } },
 };
 
-/// One Dark theme - Atom's iconic dark theme
 pub const one_dark = Theme{
     .name = "One Dark",
     .description = "Atom's iconic dark theme",
@@ -431,7 +389,6 @@ pub const one_dark = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 171, .g = 178, .b = 191 } },
 };
 
-/// Cyberpunk theme - Neon colors on dark background
 pub const cyberpunk = Theme{
     .name = "Cyberpunk",
     .description = "Neon colors inspired by cyberpunk aesthetics",
@@ -453,7 +410,6 @@ pub const cyberpunk = Theme{
     .text_inverted = Color{ .rgb = .{ .r = 13, .g = 2, .b = 33 } },
 };
 
-/// Matrix theme - Classic green-on-black terminal look
 pub const matrix = Theme{
     .name = "Matrix",
     .description = "Classic green-on-black hacker aesthetic",
@@ -475,7 +431,6 @@ pub const matrix = Theme{
     .text_inverted = .black,
 };
 
-/// High Contrast theme - Maximum readability
 pub const high_contrast = Theme{
     .name = "High Contrast",
     .description = "Maximum readability with stark contrasts",
@@ -497,7 +452,6 @@ pub const high_contrast = Theme{
     .text_inverted = .black,
 };
 
-/// Array of all built-in themes for iteration
 pub const all_themes = [_]*const Theme{
     &default,
     &nord,
@@ -516,7 +470,6 @@ pub const all_themes = [_]*const Theme{
     &high_contrast,
 };
 
-/// Get a theme by name (case-insensitive)
 pub fn getByName(name: []const u8) ?*const Theme {
     for (all_themes) |theme| {
         if (eqlIgnoreCase(theme.name, name)) {
@@ -526,7 +479,6 @@ pub fn getByName(name: []const u8) ?*const Theme {
     return null;
 }
 
-/// Get theme names as a slice (useful for menus/selection)
 pub fn getThemeNames() [all_themes.len][]const u8 {
     var names: [all_themes.len][]const u8 = undefined;
     for (all_themes, 0..) |theme, i| {
@@ -535,7 +487,6 @@ pub fn getThemeNames() [all_themes.len][]const u8 {
     return names;
 }
 
-/// Case-insensitive string comparison
 fn eqlIgnoreCase(a: []const u8, b: []const u8) bool {
     if (a.len != b.len) return false;
     for (a, b) |ca, cb| {

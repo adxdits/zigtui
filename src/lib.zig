@@ -1,8 +1,7 @@
-//! ZigTUI - Terminal UI library for Zig
-
 const std = @import("std");
 
-// Core modules
+// ── Core modules ─────────────────────────────────────────────────
+
 pub const backend = @import("backend/mod.zig");
 pub const terminal = @import("terminal/mod.zig");
 pub const render = @import("render/mod.zig");
@@ -12,30 +11,54 @@ pub const style = @import("style/mod.zig");
 pub const events = @import("events/mod.zig");
 pub const graphics = @import("graphics/mod.zig");
 
-// Re-export commonly used types
+// ── Re-exported types (convenience) ──────────────────────────────
+
+// Terminal & rendering
 pub const Terminal = terminal.Terminal;
 pub const Buffer = render.Buffer;
 pub const Cell = render.Cell;
 pub const Rect = render.Rect;
+pub const Size = render.Size;
+
+// Styling
 pub const Color = style.Color;
 pub const Style = style.Style;
 pub const Modifier = style.Modifier;
 pub const Theme = style.Theme;
 pub const themes = style.themes;
+
+// Events
 pub const Event = events.Event;
 pub const KeyEvent = events.KeyEvent;
 pub const KeyCode = events.KeyCode;
+pub const KeyModifiers = events.KeyModifiers;
+pub const MouseEvent = events.MouseEvent;
+
+// Backend
 pub const Backend = backend.Backend;
 pub const NativeBackend = backend.NativeBackend;
 
-// Graphics types
+// Layout
+pub const Layout = layout.Layout;
+pub const Constraint = layout.Constraint;
+
+// Widgets
+pub const Block = widgets.Block;
+pub const Borders = widgets.Borders;
+pub const BorderSymbols = widgets.BorderSymbols;
+pub const Paragraph = widgets.Paragraph;
+pub const List = widgets.List;
+pub const ListItem = widgets.ListItem;
+pub const Gauge = widgets.Gauge;
+pub const LineGauge = widgets.LineGauge;
+pub const Table = widgets.Table;
+
+// Graphics
 pub const Graphics = graphics.Graphics;
 pub const KittyGraphics = graphics.KittyGraphics;
 pub const Image = graphics.Image;
-pub const ImageWidget = graphics.ImageWidget;
+pub const ImageWidget = widgets.ImageWidget;
 
-/// Initialize the native backend for the current platform.
-/// Convenience function that automatically selects WindowsBackend or AnsiBackend.
 pub const init = backend.init;
 
 test {

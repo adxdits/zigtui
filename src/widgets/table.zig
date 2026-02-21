@@ -1,5 +1,3 @@
-//! Table widget - display data in rows and columns
-
 const std = @import("std");
 const render = @import("../render/mod.zig");
 const style = @import("../style/mod.zig");
@@ -136,7 +134,6 @@ pub const Table = struct {
     }
 };
 
-/// Helper to build tables more ergonomically
 pub const TableBuilder = struct {
     allocator: std.mem.Allocator,
     columns: std.ArrayList(Column),

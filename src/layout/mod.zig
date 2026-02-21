@@ -1,26 +1,16 @@
-//! Layout module - Constraint-based layout system
-
 const std = @import("std");
 const render = @import("../render/mod.zig");
 const Rect = render.Rect;
 const Allocator = std.mem.Allocator;
 
-/// Constraint types for layout
 pub const Constraint = union(enum) {
-    /// Fixed number of cells
     fixed: u16,
-    /// Minimum number of cells
     min: u16,
-    /// Maximum number of cells
     max: u16,
-    /// Percentage of available space (0-100)
     percentage: u8,
-    /// Ratio of available space
     ratio: struct { numerator: u32, denominator: u32 },
-    /// Length based on content
     length: u16,
 
-    /// Apply constraint to available space
     pub fn apply(self: Constraint, available: u16) u16 {
         return switch (self) {
             .fixed => |f| @min(f, available),
@@ -39,13 +29,11 @@ pub const Constraint = union(enum) {
     }
 };
 
-/// Layout direction
 pub const Direction = enum {
     horizontal,
     vertical,
 };
 
-/// Margin around a rectangle
 pub const Margin = struct {
     left: u16 = 0,
     right: u16 = 0,
@@ -56,7 +44,6 @@ pub const Margin = struct {
     pub const ALL_1 = Margin{ .left = 1, .right = 1, .top = 1, .bottom = 1 };
     pub const ALL_2 = Margin{ .left = 2, .right = 2, .top = 2, .bottom = 2 };
 
-    /// Apply margin to rectangle
     pub fn apply(self: Margin, rect: Rect) Rect {
         const horizontal = self.left + self.right;
         const vertical = self.top + self.bottom;
@@ -74,14 +61,12 @@ pub const Margin = struct {
     }
 };
 
-/// Alignment options
 pub const Alignment = enum {
     left,
     center,
     right,
 };
 
-/// Layout builder for fluent API
 pub const LayoutBuilder = struct {
     _direction: Direction = .vertical,
     _constraints: []const Constraint = &[_]Constraint{},
@@ -115,18 +100,15 @@ pub const LayoutBuilder = struct {
     }
 };
 
-/// Layout calculator
 pub const Layout = struct {
     direction: Direction,
     constraints: []const Constraint,
     margin: Margin = .{},
 
-    /// Create a default Layout builder
     pub fn default() LayoutBuilder {
         return LayoutBuilder{};
     }
 
-    /// Calculate layout areas
     pub fn split(self: Layout, area: Rect, allocator: Allocator) ![]Rect {
         // Apply margin
         const inner = self.margin.apply(area);
@@ -227,7 +209,7 @@ test "Margin application" {
 test "Layout split horizontal" {
     const allocator = std.testing.allocator;
     const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 20 };
-    
+
     const layout = Layout{
         .direction = .horizontal,
         .constraints = &[_]Constraint{

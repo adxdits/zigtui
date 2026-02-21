@@ -1,6 +1,3 @@
-//! Graphics module - Image rendering for terminal UIs
-//! Supports Kitty Graphics Protocol with fallback to text/unicode block characters
-
 const std = @import("std");
 const render_mod = @import("../render/mod.zig");
 const style = @import("../style/mod.zig");
@@ -16,24 +13,17 @@ pub const Placement = kitty.Placement;
 pub const Format = kitty.Format;
 pub const Capability = kitty.Capability;
 
-/// Graphics capability of the terminal
 pub const GraphicsMode = enum {
-    /// Terminal supports Kitty graphics protocol
     kitty,
-    /// Terminal supports Sixel graphics
     sixel,
-    /// Fallback to Unicode block characters
     block,
-    /// No graphics support, use ASCII
     ascii,
 };
 
-/// Graphics interface — falls back to block characters if needed
 pub const Graphics = struct {
     allocator: Allocator,
     mode: GraphicsMode,
     kitty_gfx: ?KittyGraphics,
-    /// Whether graphics support has been detected
     detected: bool = false,
 
     pub fn init(allocator: Allocator) Graphics {
@@ -50,9 +40,6 @@ pub const Graphics = struct {
         }
     }
 
-    /// Detect graphics capabilities by querying the terminal
-    /// Returns the detected graphics mode
-    /// Note: This is a synchronous check - for async detection, use detectAsync
     pub fn detect(self: *Graphics) GraphicsMode {
         // Check environment variables first for quick detection
         if (self.detectFromEnv()) |mode| {
@@ -70,7 +57,6 @@ pub const Graphics = struct {
         return self.mode;
     }
 
-    /// Detect graphics support from environment variables
     fn detectFromEnv(self: *Graphics) ?GraphicsMode {
         _ = self;
 
@@ -107,7 +93,6 @@ pub const Graphics = struct {
         return null;
     }
 
-    /// Force a specific graphics mode (useful for testing or manual override)
     pub fn setMode(self: *Graphics, mode: GraphicsMode) void {
         self.mode = mode;
         self.detected = true;
@@ -117,13 +102,10 @@ pub const Graphics = struct {
         }
     }
 
-    /// Check if the terminal supports true image display
     pub fn supportsImages(self: Graphics) bool {
         return self.mode == .kitty or self.mode == .sixel;
     }
 
-    /// Draw an image using the best available method
-    /// Returns escape sequence for Kitty mode, or null if using fallback
     pub fn drawImage(
         self: *Graphics,
         image: Image,
@@ -147,7 +129,6 @@ pub const Graphics = struct {
         }
     }
 
-    /// Render an image as Unicode block characters (fallback for terminals without graphics support)
     pub fn renderImageToBuffer(
         self: *Graphics,
         image: Image,
@@ -199,8 +180,7 @@ pub const Graphics = struct {
         }
     }
 
-    /// Render a placeholder text in the area
-    fn renderPlaceholder(buffer: *render_mod.Buffer, area: render_mod.Rect, text: []const u8) void {
+    pub fn renderPlaceholder(buffer: *render_mod.Buffer, area: render_mod.Rect, text: []const u8) void {
         if (area.height == 0 or area.width == 0) return;
 
         const text_len = @min(text.len, area.width);
@@ -210,7 +190,6 @@ pub const Graphics = struct {
         buffer.setString(start_x, start_y, text[0..text_len], .{ .fg = .gray });
     }
 
-    /// Sample a pixel from image data and convert to Color
     fn samplePixel(data: []const u8, width: u32, stride: u32, x: usize, y: usize) style.Color {
         const idx = (y * @as(usize, width) + x) * @as(usize, stride);
         if (idx + 2 >= data.len) {
@@ -224,7 +203,6 @@ pub const Graphics = struct {
         } };
     }
 
-    /// Get escape sequence to query graphics support
     pub fn getQuerySequence(self: *Graphics) !?[]const u8 {
         if (self.kitty_gfx) |*kg| {
             return try kg.querySupport();
@@ -235,7 +213,6 @@ pub const Graphics = struct {
         return try kg.querySupport();
     }
 
-    /// Delete all images from the terminal
     pub fn clearImages(self: *Graphics) !?[]const u8 {
         if (self.kitty_gfx) |*kg| {
             return try kg.deleteImages(.all, null);
@@ -244,49 +221,7 @@ pub const Graphics = struct {
     }
 };
 
-/// Widget for displaying images in the TUI
-pub const ImageWidget = struct {
-    image: ?Image = null,
-    placement: Placement = .{},
-    fallback_text: []const u8 = "[Image]",
-
-    /// Set the image to display
-    pub fn setImage(self: *ImageWidget, image: Image) void {
-        self.image = image;
-    }
-
-    /// Set placement options
-    pub fn setPlacement(self: *ImageWidget, placement: Placement) void {
-        self.placement = placement;
-    }
-
-    /// Draw the image widget
-    /// If graphics is available, returns escape sequence; otherwise renders to buffer
-    pub fn draw(
-        self: ImageWidget,
-        gfx: *Graphics,
-        buffer: *render_mod.Buffer,
-        area: render_mod.Rect,
-    ) !?[]const u8 {
-        if (self.image) |img| {
-            if (gfx.supportsImages()) {
-                var placement = self.placement;
-                placement.x = area.x;
-                placement.y = area.y;
-                placement.width = area.width;
-                placement.height = area.height;
-                return try gfx.drawImage(img, placement);
-            } else {
-                gfx.renderImageToBuffer(img, buffer, area);
-                return null;
-            }
-        } else {
-            // No image set, render placeholder
-            Graphics.renderPlaceholder(buffer, area, self.fallback_text);
-            return null;
-        }
-    }
-};
+pub const ImageWidget = @import("../widgets/image.zig").ImageWidget;
 
 test "graphics mode detection from env" {
     const allocator = std.testing.allocator;
@@ -314,10 +249,10 @@ test "render image to buffer fallback" {
 
     // Create a small test image (2x2 RGBA)
     const img_data = [_]u8{
-        255, 0,   0,   255, // Red
-        0,   255, 0,   255, // Green
-        0,   0,   255, 255, // Blue
-        255, 255, 0,   255, // Yellow
+        255, 0, 0, 255, // Red
+        0, 255, 0, 255, // Green
+        0, 0, 255, 255, // Blue
+        255, 255, 0, 255, // Yellow
     };
 
     const image = Image.fromRGBA(&img_data, 2, 2);
