@@ -222,3 +222,20 @@ pub const Table = @import("table.zig").Table;
 pub const TableBuilder = @import("table.zig").TableBuilder;
 pub const Row = @import("table.zig").Row;
 pub const Column = @import("table.zig").Column;
+
+// ── New widgets ───────────────────────────────────────────────────────────────
+pub const Tabs = @import("tabs.zig").Tabs;
+pub const Sparkline = @import("sparkline.zig").Sparkline;
+pub const Bar = @import("bar_chart.zig").Bar;
+pub const BarDirection = @import("bar_chart.zig").BarDirection;
+pub const BarChart = @import("bar_chart.zig").BarChart;
+pub const TextInput = @import("text_input.zig").TextInput;
+pub const SpinnerKind = @import("spinner.zig").SpinnerKind;
+pub const Spinner = @import("spinner.zig").Spinner;
+pub const TreeNode = @import("tree.zig").TreeNode;
+pub const Tree = @import("tree.zig").Tree;
+pub const Canvas = @import("canvas.zig").Canvas;
+pub const Popup = @import("popup.zig").Popup;
+pub const Dialog = @import("popup.zig").Dialog;
+pub const centeredRectPct = @import("popup.zig").centeredRectPct;
+pub const centeredRectFixed = @import("popup.zig").centeredRectFixed;
