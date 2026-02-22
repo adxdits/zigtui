@@ -52,6 +52,21 @@ pub const ListItem = widgets.ListItem;
 pub const Gauge = widgets.Gauge;
 pub const LineGauge = widgets.LineGauge;
 pub const Table = widgets.Table;
+pub const Tabs = widgets.Tabs;
+pub const Sparkline = widgets.Sparkline;
+pub const Bar = widgets.Bar;
+pub const BarDirection = widgets.BarDirection;
+pub const BarChart = widgets.BarChart;
+pub const TextInput = widgets.TextInput;
+pub const SpinnerKind = widgets.SpinnerKind;
+pub const Spinner = widgets.Spinner;
+pub const TreeNode = widgets.TreeNode;
+pub const Tree = widgets.Tree;
+pub const Canvas = widgets.Canvas;
+pub const Popup = widgets.Popup;
+pub const Dialog = widgets.Dialog;
+pub const centeredRectPct = widgets.centeredRectPct;
+pub const centeredRectFixed = widgets.centeredRectFixed;
 
 // Graphics
 pub const Graphics = graphics.Graphics;

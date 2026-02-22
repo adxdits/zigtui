@@ -106,4 +106,24 @@ pub fn build(b: *std.Build) void {
     run_mouse.step.dependOn(&install_mouse.step);
     const run_mouse_step = b.step("run-mouse", "Run mouse demo");
     run_mouse_step.dependOn(&run_mouse.step);
+
+    // Example: Widgets Demo (new widgets showcase)
+    const widgets_demo_example = b.addExecutable(.{
+        .name = "widgets_demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/widgets_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zigtui", .module = zigtui_module },
+            },
+        }),
+    });
+    const install_widgets_demo = b.addInstallArtifact(widgets_demo_example, .{});
+    examples_step.dependOn(&install_widgets_demo.step);
+
+    const run_widgets_demo = b.addRunArtifact(widgets_demo_example);
+    run_widgets_demo.step.dependOn(&install_widgets_demo.step);
+    const run_widgets_demo_step = b.step("run-widgets-demo", "Run new widgets showcase");
+    run_widgets_demo_step.dependOn(&run_widgets_demo.step);
 }
