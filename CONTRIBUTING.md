@@ -44,14 +44,14 @@ examples/
 ## Making changes
 
 1. Fork the repo and create a branch off `main`.
-2. Make your changes. Keep commits focused — one logical change per commit.
+2. Make your changes. Keep commits focused one logical change per commit.
 3. Run `zig build test` and make sure the examples still work.
 4. Open a pull request.
 
 ## Code style
 
 - Follow the existing patterns in the codebase.
-- No hidden allocations — all allocators are passed explicitly.
+- No hidden allocations all allocators are passed explicitly.
 - Keep doc comments short and factual. Describe *what*, not *why it's amazing*.
 - Use `snake_case` for functions and variables, `PascalCase` for types (standard Zig conventions).
 

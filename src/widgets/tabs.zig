@@ -5,18 +5,6 @@ const Rect = render.Rect;
 const Buffer = render.Buffer;
 const Style = style.Style;
 
-/// A horizontal tab bar.
-///
-/// Usage:
-/// ```zig
-/// var tabs = Tabs{
-///     .titles = &.{ "Overview", "Details", "Logs" },
-///     .selected = 0,
-///     .selected_style  = .{ .fg = .yellow, .modifier = .{ .bold = true } },
-///     .unselected_style = .{ .fg = .dark_gray },
-/// };
-/// tabs.render(area, buf);
-/// ```
 pub const Tabs = struct {
     titles: []const []const u8,
     selected: usize = 0,

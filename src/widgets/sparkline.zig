@@ -6,19 +6,8 @@ const Buffer = render.Buffer;
 const Style = style.Style;
 
 /// Block characters used to represent 8 discrete height levels.
-/// Ordered from lowest to highest: ▁ ▂ ▃ ▄ ▅ ▆ ▇ █
 const BLOCK_CHARS = [8]u21{ 0x2581, 0x2582, 0x2583, 0x2584, 0x2585, 0x2586, 0x2587, 0x2588 };
 
-/// An inline single-row mini bar chart, useful for showing a recent metric trend.
-///
-/// Usage:
-/// ```zig
-/// const data = [_]f64{ 1, 3, 2, 5, 4, 6, 3, 7, 8, 5 };
-/// Sparkline{
-///     .data  = &data,
-///     .style = .{ .fg = .green },
-/// }.render(area, buf);
-/// ```
 pub const Sparkline = struct {
     /// Data points. Values outside [0, max] are clamped.
     data: []const f64,

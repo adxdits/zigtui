@@ -5,28 +5,6 @@ const Rect = render.Rect;
 const Buffer = render.Buffer;
 const Style = style.Style;
 
-/// A single-line, stateful text-input widget backed by a comptime-sized buffer.
-///
-/// Use `TextInput(256)` for a 256-byte buffer, or any other power-of-two size.
-/// Content is always valid UTF-8 (insertions of multi-byte codepoints are handled
-/// via `insertCodepoint`; `insertByte` is provided for ASCII convenience).
-///
-/// Usage:
-/// ```zig
-/// var input = TextInput(128){
-///     .style        = .{ .fg = .white },
-///     .cursor_style = .{ .fg = .black, .bg = .white, .modifier = .{ .bold = true } },
-///     .placeholder  = "Type here…",
-/// };
-/// // Feed keys from the event loop:
-/// if (event.key.code == .char) input.insertCodepoint(event.key.code.char);
-/// if (event.key.code == .backspace) input.deleteBackward();
-/// if (event.key.code == .left)  input.moveCursorLeft();
-/// if (event.key.code == .right) input.moveCursorRight();
-/// if (event.key.code == .home)  input.moveCursorHome();
-/// if (event.key.code == .end)   input.moveCursorEnd();
-/// input.render(area, buf);
-/// ```
 pub fn TextInput(comptime max_bytes: usize) type {
     return struct {
         const Self = @This();
@@ -42,7 +20,6 @@ pub fn TextInput(comptime max_bytes: usize) type {
         placeholder: []const u8 = "",
         placeholder_style: Style = .{},
 
-        // ── Content helpers ───────────────────────────────────────────────────
 
         /// Return the current text as a slice.
         pub fn value(self: *const Self) []const u8 {
@@ -54,8 +31,6 @@ pub fn TextInput(comptime max_bytes: usize) type {
             self.len = 0;
             self.cursor = 0;
         }
-
-        // ── Insertion ────────────────────────────────────────────────────────
 
         /// Insert a Unicode codepoint at the cursor position.
         pub fn insertCodepoint(self: *Self, cp: u21) void {
@@ -80,8 +55,6 @@ pub fn TextInput(comptime max_bytes: usize) type {
             self.cursor += bytes.len;
         }
 
-        // ── Deletion ─────────────────────────────────────────────────────────
-
         /// Delete the codepoint immediately before the cursor (backspace).
         pub fn deleteBackward(self: *Self) void {
             if (self.cursor == 0) return;
@@ -100,8 +73,6 @@ pub fn TextInput(comptime max_bytes: usize) type {
             self.len -= cp_len;
         }
 
-        // ── Cursor movement ───────────────────────────────────────────────────
-
         pub fn moveCursorLeft(self: *Self) void {
             if (self.cursor == 0) return;
             self.cursor -= self.prevCodepointLen();
@@ -119,8 +90,6 @@ pub fn TextInput(comptime max_bytes: usize) type {
         pub fn moveCursorEnd(self: *Self) void {
             self.cursor = self.len;
         }
-
-        // ── Rendering ────────────────────────────────────────────────────────
 
         pub fn render(self: *const Self, area: Rect, buf: *Buffer) void {
             if (area.width == 0 or area.height == 0) return;

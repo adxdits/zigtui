@@ -10,11 +10,6 @@ const Borders = widgets_mod.Borders;
 const BorderSymbols = widgets_mod.BorderSymbols;
 const Paragraph = widgets_mod.Paragraph;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared geometry helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Return a `Rect` centred within `area` using percentage dimensions.
 /// `percent_x` and `percent_y` are clamped to [0, 100].
 pub fn centeredRectPct(area: Rect, percent_x: u8, percent_y: u8) Rect {
     const px = @min(percent_x, 100);
@@ -36,23 +31,6 @@ pub fn centeredRectFixed(area: Rect, width: u16, height: u16) Rect {
     };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Popup
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// A floating overlay that dims the area behind it and draws a bordered box.
-///
-/// The caller is responsible for computing the area (use `centeredRectPct` or
-/// `centeredRectFixed`) and for rendering the popup's *content* inside
-/// `popup.innerArea(area)` after calling `popup.render(area, buf)`.
-///
-/// Usage:
-/// ```zig
-/// const pop_area = popup.centeredRectPct(terminal_area, 60, 40);
-/// popup.render(pop_area, buf);
-/// // Render content inside the popup
-/// Paragraph{ .text = "Loading…" }.render(popup.innerArea(pop_area), buf);
-/// ```
 pub const Popup = struct {
     title: ?[]const u8 = null,
     style: Style = .{},
@@ -98,27 +76,6 @@ pub const Popup = struct {
     }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Dialog
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// A modal dialog with a message, a title, and a row of buttons.
-/// The dialog auto-sizes to a centred rectangle; use `dialogArea` to compute it.
-///
-/// Usage:
-/// ```zig
-/// var dlg = Dialog{
-///     .title   = "Confirm",
-///     .message = "Are you sure you want to quit?",
-///     .buttons = &.{ "Yes", "No" },
-///     .selected_button = 0,
-/// };
-/// const da = Dialog.dialogArea(terminal_area, 50, 7);
-/// dlg.render(da, buf);
-/// // In event loop:
-/// if (event.key.code == .left)  dlg.selectPreviousButton();
-/// if (event.key.code == .right) dlg.selectNextButton();
-/// ```
 pub const Dialog = struct {
     message: []const u8 = "",
     title: ?[]const u8 = null,

@@ -16,22 +16,6 @@ pub const Bar = struct {
 /// Direction the chart grows toward.
 pub const BarDirection = enum { vertical, horizontal };
 
-/// A bar chart widget that supports both vertical and horizontal layouts.
-///
-/// Vertical example (default):
-/// ```zig
-/// const bars = [_]Bar{
-///     .{ .label = "CPU", .value = 72 },
-///     .{ .label = "RAM", .value = 45 },
-///     .{ .label = "Net", .value = 91 },
-/// };
-/// BarChart{
-///     .bars      = &bars,
-///     .max       = 100,
-///     .bar_width = 5,
-///     .bar_style = .{ .fg = .cyan },
-/// }.render(area, buf);
-/// ```
 pub const BarChart = struct {
     bars: []const Bar,
     /// Explicit maximum. When null the maximum `value` in `bars` is used.
@@ -60,10 +44,6 @@ pub const BarChart = struct {
             .horizontal => self.renderHorizontal(area, buf, max_val),
         }
     }
-
-    // ── Vertical layout ───────────────────────────────────────────────────────
-    // Bars grow upward from the bottom.  One label row at the bottom, the rest
-    // is the chart area.
 
     fn renderVertical(self: BarChart, area: Rect, buf: *Buffer, max_val: f64) void {
         if (area.height < 2) return;
@@ -104,9 +84,6 @@ pub const BarChart = struct {
             x += stride;
         }
     }
-
-    // ── Horizontal layout ─────────────────────────────────────────────────────
-    // Bars grow rightward.  Labels are in the leftmost column block.
 
     fn renderHorizontal(self: BarChart, area: Rect, buf: *Buffer, max_val: f64) void {
         // Determine label column width (max label length, capped at 1/3 of area)

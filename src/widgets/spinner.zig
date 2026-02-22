@@ -7,29 +7,13 @@ const Style = style.Style;
 
 /// The set of frames used for the animation.
 pub const SpinnerKind = enum {
-    /// ⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏  (braille dots)
     dots,
-    /// - \ | /
     line,
-    /// ← ↖ ↑ ↗ → ↘ ↓ ↙
     arrow,
-    /// ▏▎▍▌▋▊▉█▉▊▌▍▎  (bouncing block)
     bounce,
-    /// ▁▂▃▄▅▆▇█▇▆▅▄▃▂  (growing bar)
     bar,
 };
 
-/// An animated single-cell (or short sequence) loading indicator.
-///
-/// Call `tick()` once per render frame to advance the animation.
-///
-/// Usage:
-/// ```zig
-/// var spinner = Spinner{ .kind = .dots, .style = .{ .fg = .cyan } };
-/// // in event loop:
-/// spinner.tick();
-/// spinner.render(area, buf);
-/// ```
 pub const Spinner = struct {
     kind: SpinnerKind = .dots,
     frame: usize = 0,
