@@ -1,0 +1,78 @@
+/* ZigTUI – Docusaurus custom theme */
+/* zig orange: #F7A41D  |  dark bg: #18191a */
+
+:root {
+  --ifm-color-primary: #f7a41d;
+  --ifm-color-primary-dark: #e89410;
+  --ifm-color-primary-darker: #dc8b0f;
+  --ifm-color-primary-darkest: #b5720c;
+  --ifm-color-primary-light: #f9b23a;
+  --ifm-color-primary-lighter: #f9b848;
+  --ifm-color-primary-lightest: #fbcc78;
+  --ifm-code-font-size: 92%;
+  --docusaurus-highlighted-code-line-bg: rgba(247, 164, 29, 0.12);
+}
+
+[data-theme="dark"] {
+  --ifm-color-primary: #f7a41d;
+  --ifm-color-primary-dark: #e89410;
+  --ifm-color-primary-darker: #dc8b0f;
+  --ifm-color-primary-darkest: #b5720c;
+  --ifm-color-primary-light: #f9b23a;
+  --ifm-color-primary-lighter: #f9b848;
+  --ifm-color-primary-lightest: #fbcc78;
+  --ifm-background-color: #0f1117;
+  --ifm-background-surface-color: #18191a;
+  --docusaurus-highlighted-code-line-bg: rgba(247, 164, 29, 0.12);
+}
+
+/* Hero gradient */
+.hero--primary {
+  background: linear-gradient(135deg, #0f1117 0%, #1a1c2b 60%, #1e1612 100%);
+}
+
+.hero__title {
+  font-size: 3.5rem;
+  color: #f7a41d;
+}
+
+.hero__subtitle {
+  color: #c9d1d9;
+}
+
+/* Badge strip under hero */
+.hero-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 1rem 0 0;
+}
+
+/* Feature cards */
+.feature-card {
+  background: var(--ifm-background-surface-color);
+  border: 1px solid #2d2f31;
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: border-color 0.2s;
+}
+
+.feature-card:hover {
+  border-color: var(--ifm-color-primary);
+}
+
+.feature-card svg {
+  color: var(--ifm-color-primary);
+  margin-bottom: 0.75rem;
+}
+
+/* Code block tweak */
+.prism-code {
+  border-radius: 8px !important;
+}
+
+/* Navbar logo placeholder (SVG text logo) */
+.navbar__logo img {
+  height: 24px;
+}

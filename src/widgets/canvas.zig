@@ -5,18 +5,6 @@ const Rect = render.Rect;
 const Buffer = render.Buffer;
 const Style = style.Style;
 
-/// Low-level drawing context.  Obtain one with `Canvas.init`, then call its
-/// draw methods.  All coordinates are *relative to the canvas origin* (0, 0
-/// is the top-left cell of the area passed to `init`).
-///
-/// Usage:
-/// ```zig
-/// var cv = Canvas.init(area, buf, .{});
-/// cv.fillRect(.{ .x = 0, .y = 0, .width = 10, .height = 5 }, '░', .{ .fg = .blue });
-/// cv.drawBox(.{ .x = 0, .y = 0, .width = 10, .height = 5 },  .{ .fg = .white });
-/// cv.drawLine(0, 0, 9, 4, '*', .{ .fg = .yellow });
-/// cv.drawText(1, 1, "hello", .{ .fg = .green });
-/// ```
 pub const Canvas = struct {
     area: Rect,
     buf: *Buffer,
@@ -100,7 +88,7 @@ pub const Canvas = struct {
 
     /// Draw a line between two arbitrary points using Bresenham's algorithm.
     pub fn drawLine(self: Canvas, x1: u16, y1: u16, x2: u16, y2: u16, char: u21, s: Style) void {
-        // Bresenham — work in signed integers to handle all octants correctly.
+        // Bresenham work in signed integers to handle all octants correctly.
         var sx: i32 = @intCast(x1);
         var sy: i32 = @intCast(y1);
         const ex: i32 = @intCast(x2);

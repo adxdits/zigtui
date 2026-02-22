@@ -66,7 +66,7 @@ pub fn main() !void {
                 const area = buf.getArea();
 
                 const block = tui.widgets.Block{
-                    .title = "Mouse demo — press 'q' to quit",
+                    .title = "Mouse demo press 'q' to quit",
                     .borders = tui.widgets.Borders.all(),
                     .border_style = .{ .fg = .cyan },
                 };

@@ -70,7 +70,7 @@ pub const Terminal = struct {
         var delta = try self.current_buffer.diff(self.next_buffer, alloc);
         defer delta.deinit();
 
-        // Nothing changed — skip the write entirely
+        // Nothing changed skip the write entirely
         if (delta.updates.items.len == 0) return;
 
         // Build output buffer

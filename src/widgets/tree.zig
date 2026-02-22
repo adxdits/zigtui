@@ -18,28 +18,6 @@ pub const TreeNode = struct {
     }
 };
 
-/// A hierarchical list widget for rendering file trees, JSON explorers, etc.
-///
-/// The `selected` field is a *flat visible-row index* (0 = first visible node).
-/// Call `selectNext` / `selectPrevious` to move through the visible rows;
-/// call `toggleExpanded` to open/close the selected node.
-///
-/// **Note:** This widget is stateless w.r.t. allocation — it walks `roots`
-/// recursively on every `render` call. For very deep trees this is acceptable;
-/// if performance matters, pre-flatten the visible list externally.
-///
-/// Usage:
-/// ```zig
-/// const nodes = [_]TreeNode{
-///     .{ .label = "src", .expanded = true, .children = &.{
-///         .{ .label = "main.zig" },
-///         .{ .label = "lib.zig" },
-///     }},
-///     .{ .label = "build.zig" },
-/// };
-/// var tree = Tree{ .roots = &nodes };
-/// tree.render(area, buf);
-/// ```
 pub const Tree = struct {
     roots: []const TreeNode,
     selected: ?usize = null,
@@ -174,10 +152,6 @@ pub const Tree = struct {
         }
     }
 
-    /// Toggle the expanded state of the selected node (no-op on leaf nodes).
-    /// Because `roots` is a const slice this returns the flat index and depth so
-    /// the caller can mutate its own node array.  For convenience, we provide a
-    /// version that works on a mutable roots slice.
     pub fn toggleSelectedNode(self: *Tree, mutable_roots: []TreeNode) void {
         if (self.selected) |sel| {
             _ = toggleAtIndex(mutable_roots, sel, 0);

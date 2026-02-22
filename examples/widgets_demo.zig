@@ -1,4 +1,4 @@
-/// widgets_demo.zig — interactive showcase of every new widget.
+/// widgets_demo.zig interactive showcase of every new widget.
 ///
 /// Controls:
 ///   Tab / Shift+Tab  → cycle through demo tabs
@@ -115,7 +115,7 @@ const AppState = struct {
 
     /// Must be called once after `init()` returns, while `self` is in its final
     /// stack slot.  Sets up tree child-slice pointers that must refer to fields
-    /// of the *live* AppState — not a temporary copy on the init() stack frame.
+    /// of the *live* AppState not a temporary copy on the init() stack frame.
     fn initNodes(self: *AppState) void {
         self.src_children = .{
             TreeNode{ .label = "lib.zig" },
@@ -318,7 +318,7 @@ fn drawFrame(state: *AppState, buf: *Buffer) void {
 
     // Outer border
     const outer = Block{
-        .title = " ZigTUI — New Widgets Demo ",
+        .title = " ZigTUI New Widgets Demo ",
         .borders = Borders.ALL,
         .border_style = .{ .fg = .cyan },
         .title_style = .{ .fg = .white, .modifier = .{ .bold = true } },
@@ -390,7 +390,7 @@ fn drawContent(state: *AppState, area: Rect, buf: *Buffer) void {
 
 fn drawSparklineTab(state: *AppState, area: Rect, buf: *Buffer) void {
     const blk = Block{
-        .title = " Live Metric — Sparkline ",
+        .title = " Live Metric Sparkline ",
         .borders = Borders.ALL,
         .border_style = .{ .fg = .gray },
         .title_style = .{ .fg = .green, .modifier = .{ .bold = true } },
@@ -441,7 +441,7 @@ const bar_data = [_]Bar{
 fn drawBarChartTab(state: *AppState, area: Rect, buf: *Buffer) void {
     const dir_label: []const u8 = if (state.bar_direction == .vertical) "Vertical" else "Horizontal";
     var title_buf: [40]u8 = undefined;
-    const title = std.fmt.bufPrint(&title_buf, " Monthly Revenue — {s} (d=toggle) ", .{dir_label}) catch " Monthly Revenue ";
+    const title = std.fmt.bufPrint(&title_buf, " Monthly Revenue {s} (d=toggle) ", .{dir_label}) catch " Monthly Revenue ";
 
     const blk = Block{
         .title = title,
@@ -484,7 +484,7 @@ fn drawTextInputTab(state: *AppState, area: Rect, buf: *Buffer) void {
     if (inner.height == 0 or inner.width == 0) return;
 
     // Instruction rows
-    buf.setString(inner.x, inner.y, "Single-line editable field — type, use ← → Home/End/Backspace/Del", .{ .fg = .dark_gray });
+    buf.setString(inner.x, inner.y, "Single-line editable field type, use ← → Home/End/Backspace/Del", .{ .fg = .dark_gray });
 
     if (inner.height < 3) return;
 
@@ -568,7 +568,7 @@ fn drawTreeTab(state: *AppState, area: Rect, buf: *Buffer) void {
 
 fn drawCanvasTab(area: Rect, buf: *Buffer) void {
     const blk = Block{
-        .title = " Canvas — drawing primitives ",
+        .title = " Canvas drawing primitives ",
         .borders = Borders.ALL,
         .border_style = .{ .fg = .gray },
         .title_style = .{ .fg = .red, .modifier = .{ .bold = true } },
@@ -623,10 +623,10 @@ fn drawPopupInfoTab(area: Rect, buf: *Buffer) void {
         \\Press [p] to show a Popup overlay.
         \\Press [q] or [Esc] to open a Dialog (with Yes/No buttons).
         \\
-        \\Popup    — bordered floating box with optional backdrop dimming.
+        \\Popup    bordered floating box with optional backdrop dimming.
         \\           Use centeredRectPct() or centeredRectFixed() to position.
         \\
-        \\Dialog   — Popup with a message and a row of [ buttons ].
+        \\Dialog   Popup with a message and a row of [ buttons ].
         \\           Navigate buttons with ← → and confirm with Enter.
         ,
         .style = .{ .fg = .white },

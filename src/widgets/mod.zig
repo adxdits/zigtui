@@ -223,7 +223,6 @@ pub const TableBuilder = @import("table.zig").TableBuilder;
 pub const Row = @import("table.zig").Row;
 pub const Column = @import("table.zig").Column;
 
-// ── New widgets ───────────────────────────────────────────────────────────────
 pub const Tabs = @import("tabs.zig").Tabs;
 pub const Sparkline = @import("sparkline.zig").Sparkline;
 pub const Bar = @import("bar_chart.zig").Bar;
