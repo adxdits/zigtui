@@ -28,7 +28,6 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          editUrl: "https://github.com/adxdits/zigtui/tree/main/website/",
         },
         blog: false,
         theme: {
