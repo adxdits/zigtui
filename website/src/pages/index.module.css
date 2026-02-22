@@ -1,0 +1,57 @@
+.heroBanner {
+  padding: 4rem 2rem 3rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.installBlock {
+  margin: 1.5rem auto;
+  display: inline-block;
+  background: #0f1117;
+  border: 1px solid #2d2f31;
+  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+}
+
+.installCmd {
+  font-size: 0.95rem;
+  color: #f9b23a;
+  letter-spacing: 0.02em;
+}
+
+.buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.features {
+  padding: 4rem 0 2rem;
+}
+
+.featureCardWrapper {
+  margin-bottom: 1.5rem;
+}
+
+.featureIcon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.demoSection {
+  padding: 2rem 0 4rem;
+}
+
+.demoCode {
+  background: #0f1117;
+  border: 1px solid #2d2f31;
+  border-radius: 8px;
+  padding: 1.5rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #e6edf3;
+}
