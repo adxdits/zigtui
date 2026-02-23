@@ -6,7 +6,7 @@ A TUI library for Zig, inspired by [Ratatui](https://github.com/ratatui/ratatui)
 
 ## Documentation
 
-**→ [https://adxdits.github.io/zigtui/](https://adxdits.github.io/zigtui/)** full docs, widget reference, and guides.
+**[https://adxdits.github.io/zigtui/](https://adxdits.github.io/zigtui/)** full docs, widget reference, and guides.
 
 ## Quick install
 
