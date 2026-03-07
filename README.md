@@ -32,4 +32,4 @@ zig build run-widgets-demo   # Interactive showcase of all widgets
 
 ## License
 
-MIT see [LICENSE](LICENSE).
+MIT see [LICENSE](LICENSE)
