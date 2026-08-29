@@ -65,6 +65,8 @@ pub const Tree = widgets.Tree;
 pub const Canvas = widgets.Canvas;
 pub const Popup = widgets.Popup;
 pub const Dialog = widgets.Dialog;
+pub const Date = widgets.Date;
+pub const DatePicker = widgets.DatePicker;
 pub const centeredRectPct = widgets.centeredRectPct;
 pub const centeredRectFixed = widgets.centeredRectFixed;
 

@@ -134,6 +134,6 @@ pub const WindowsBackend = @import("windows.zig").WindowsBackend;
 
 pub const NativeBackend = if (@import("builtin").os.tag == .windows) WindowsBackend else AnsiBackend;
 
-pub fn init(allocator: std.mem.Allocator) !NativeBackend {
-    return NativeBackend.init(allocator);
+pub fn init(allocator: std.mem.Allocator, io: std.Io) !NativeBackend {
+    return NativeBackend.init(allocator, io);
 }

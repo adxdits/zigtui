@@ -5,6 +5,10 @@ const Rect = render.Rect;
 const Buffer = render.Buffer;
 const Style = style.Style;
 
+pub const date_picker = @import("date_picker.zig");
+pub const Date = date_picker.Date;
+pub const DatePicker = date_picker.DatePicker;
+
 pub const Widget = struct {
     ptr: *anyopaque,
     vtable: *const VTable,

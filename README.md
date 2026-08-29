@@ -30,6 +30,22 @@ zig build run-mouse          # Mouse input demo
 zig build run-widgets-demo   # Interactive showcase of all widgets
 ```
 
+## Date picker
+
+`DatePicker` provides calendar rendering and keyboard navigation. Arrow keys move by a day or week, Page Up/Down move by month, and Home/End select the first or last day.
+
+```zig
+var picker = try zigtui.DatePicker.init(.{
+	.year = 2026,
+	.month = 8,
+	.day = 29,
+});
+
+_ = picker.handleKey(key_event);
+picker.render(area, buffer);
+const selected_date = picker.selected;
+```
+
 ## License
 
 MIT see [LICENSE](LICENSE)

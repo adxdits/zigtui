@@ -11,7 +11,7 @@ ZigTUI is a TUI (terminal user interface) library for Zig, inspired by [Ratatui]
 
 ## Requirements
 
-- Zig **0.15.0** or newer
+- Zig **0.16.0** or newer
 - A terminal emulator (Windows Terminal, Kitty, WezTerm, iTerm2, foot, …)
 
 ## Installation

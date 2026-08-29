@@ -22,8 +22,8 @@ const AppState = struct {
     frame_count: u64 = 0,
     image_escape_seq: ?[]const u8 = null,
 
-    fn init(allocator: std.mem.Allocator) !AppState {
-        var gfx = Graphics.init(allocator);
+    fn init(allocator: std.mem.Allocator, environ: *const std.process.Environ.Map) !AppState {
+        var gfx = Graphics.init(allocator, environ);
         const mode = gfx.detect();
 
         const status = switch (mode) {
@@ -61,13 +61,11 @@ const AppState = struct {
     }
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
     // Initialize backend and terminal
-    var backend = try tui.backend.init(allocator);
+    var backend = try tui.backend.init(allocator, init.io);
     defer backend.deinit();
 
     var terminal = try Terminal.init(allocator, backend.interface());
@@ -76,7 +74,7 @@ pub fn main() !void {
     try terminal.hideCursor();
 
     // Initialize app state with graphics detection
-    var state = try AppState.init(allocator);
+    var state = try AppState.init(allocator, init.environ_map);
     defer state.deinit(allocator);
 
     // Try to load demo.bmp - works for both Kitty and fallback mode
@@ -215,7 +213,7 @@ fn drawImagePanel(buf: *Buffer, area: Rect, state: *AppState, backend_iface: tui
 }
 
 fn drawControls(buf: *Buffer, area: Rect) void {
-    const y = area.y + area.height - 1;  // Very bottom row
+    const y = area.y + area.height - 1; // Very bottom row
     const help_style = Style{ .fg = .gray };
     const key_style = Style{ .fg = .cyan, .modifier = .{ .bold = true } };
 
@@ -281,7 +279,7 @@ fn loadDemoImage(allocator: std.mem.Allocator) !Image {
     for (paths) |path| {
         // Use the BMP decoder
         const bmp_image = tui.graphics.bmp.loadFile(allocator, path) catch continue;
-        
+
         // Transfer ownership - the Image will own this data
         return Image{
             .data = bmp_image.data,

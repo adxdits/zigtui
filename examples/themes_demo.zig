@@ -34,12 +34,10 @@ const AppState = struct {
     }
 };
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
 
-    var backend = try tui.backend.init(allocator);
+    var backend = try tui.backend.init(allocator, init.io);
     defer backend.deinit();
 
     var terminal = try Terminal.init(allocator, backend.interface());

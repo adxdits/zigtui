@@ -25,5 +25,5 @@ See the [Kitty Graphics](./kitty-graphics.md) page for image display support per
 
 ## Requirements
 
-- Zig **0.15.0** or newer  
+- Zig **0.16.0** or newer  
 - Windows: **Windows 10** build 1909 or newer (for VT processing and SGR mouse)

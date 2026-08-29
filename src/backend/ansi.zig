@@ -21,14 +21,15 @@ const termios = if (is_posix) std.posix.termios else void;
 // cannot capture instance state
 var global_resize_flag = std.atomic.Value(bool).init(false);
 
-fn handleSigwinch(_: c_int) callconv(.c) void {
+fn handleSigwinch(_: posix.SIG) callconv(.c) void {
     global_resize_flag.store(true, .release);
 }
 
 pub const AnsiBackend = struct {
     allocator: Allocator,
-    stdin: std.fs.File,
-    stdout: std.fs.File,
+    io: std.Io,
+    stdin: std.Io.File,
+    stdout: std.Io.File,
     original_termios: if (is_posix) std.posix.termios else void,
     in_raw_mode: bool = false,
     in_alternate_screen: bool = false,
@@ -43,19 +44,20 @@ pub const AnsiBackend = struct {
     original_sigaction: if (is_posix) posix.Sigaction else void = if (is_posix) std.mem.zeroes(posix.Sigaction) else {},
     sigwinch_installed: bool = false,
 
-    pub fn init(allocator: Allocator) !AnsiBackend {
+    pub fn init(allocator: Allocator, io: std.Io) !AnsiBackend {
         if (is_windows) {
             return error.UnsupportedTerminal; // Use windows.zig backend instead
         }
 
-        const stdin = std.fs.File{ .handle = std.posix.STDIN_FILENO };
-        const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
+        const stdin = std.Io.File.stdin();
+        const stdout = std.Io.File.stdout();
 
         // Save original terminal settings
         const original = if (is_posix) try posix.tcgetattr(stdin.handle) else {};
 
         return AnsiBackend{
             .allocator = allocator,
+            .io = io,
             .stdin = stdin,
             .stdout = stdout,
             .original_termios = original,
@@ -64,11 +66,11 @@ pub const AnsiBackend = struct {
 
     pub fn deinit(self: *AnsiBackend) void {
         if (self.mouse_enabled) {
-            self.stdout.writeAll("\x1b[?1006l\x1b[?1003l\x1b[?1000l") catch {};
+            self.stdout.writeStreamingAll(self.io, "\x1b[?1006l\x1b[?1003l\x1b[?1000l") catch {};
             self.mouse_enabled = false;
         }
         if (self.keyboard_enabled) {
-            self.stdout.writeAll("\x1b[<u") catch {};
+            self.stdout.writeStreamingAll(self.io, "\x1b[<u") catch {};
             self.keyboard_enabled = false;
         }
         if (self.in_alternate_screen) {
@@ -169,9 +171,9 @@ pub const AnsiBackend = struct {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (self.in_alternate_screen) return;
 
-        self.stdout.writeAll("\x1b[?1049h") catch return Error.IOError; // Enable alternate screen
-        self.stdout.writeAll("\x1b[2J") catch return Error.IOError; // Clear screen
-        self.stdout.writeAll("\x1b[H") catch return Error.IOError; // Move cursor to home
+        self.stdout.writeStreamingAll(self.io, "\x1b[?1049h") catch return Error.IOError; // Enable alternate screen
+        self.stdout.writeStreamingAll(self.io, "\x1b[2J") catch return Error.IOError; // Clear screen
+        self.stdout.writeStreamingAll(self.io, "\x1b[H") catch return Error.IOError; // Move cursor to home
         self.in_alternate_screen = true;
     }
 
@@ -179,13 +181,13 @@ pub const AnsiBackend = struct {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (!self.in_alternate_screen) return;
 
-        self.stdout.writeAll("\x1b[?1049l") catch return Error.IOError; // Disable alternate screen
+        self.stdout.writeStreamingAll(self.io, "\x1b[?1049l") catch return Error.IOError; // Disable alternate screen
         self.in_alternate_screen = false;
     }
 
     fn clearScreen(ptr: *anyopaque) Error!void {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
-        self.stdout.writeAll("\x1b[2J\x1b[H") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[2J\x1b[H") catch return Error.IOError;
     }
 
     fn write(ptr: *anyopaque, data: []const u8) Error!void {
@@ -196,7 +198,7 @@ pub const AnsiBackend = struct {
     fn flush(ptr: *anyopaque) Error!void {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (self.write_buffer.items.len > 0) {
-            self.stdout.writeAll(self.write_buffer.items) catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, self.write_buffer.items) catch return Error.IOError;
             self.write_buffer.clearRetainingCapacity();
         }
     }
@@ -276,7 +278,7 @@ pub const AnsiBackend = struct {
 
             // Read available bytes
             var buf: [64]u8 = undefined;
-            const n = self.stdin.read(&buf) catch |err| {
+            const n = self.stdin.readStreaming(self.io, &buf) catch |err| {
                 if (err == error.WouldBlock) return events.Event.none;
                 return Error.IOError;
             };
@@ -302,19 +304,19 @@ pub const AnsiBackend = struct {
 
     fn hideCursor(ptr: *anyopaque) Error!void {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
-        self.stdout.writeAll("\x1b[?25l") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[?25l") catch return Error.IOError;
     }
 
     fn showCursor(ptr: *anyopaque) Error!void {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
-        self.stdout.writeAll("\x1b[?25h") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[?25h") catch return Error.IOError;
     }
 
     fn setCursor(ptr: *anyopaque, x: u16, y: u16) Error!void {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         var buffer: [32]u8 = undefined;
         const cmd = std.fmt.bufPrint(&buffer, "\x1b[{d};{d}H", .{ y + 1, x + 1 }) catch return Error.IOError;
-        self.stdout.writeAll(cmd) catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, cmd) catch return Error.IOError;
     }
 
     fn enableKeyboardProtocol(ptr: *anyopaque, options: KeyboardProtocolOptions) Error!void {
@@ -329,7 +331,7 @@ pub const AnsiBackend = struct {
         // Flush any pending render data so the protocol sequence is not
         // interleaved with buffered output.
         if (self.write_buffer.items.len > 0) {
-            self.stdout.writeAll(self.write_buffer.items) catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, self.write_buffer.items) catch return Error.IOError;
             self.write_buffer.clearRetainingCapacity();
         }
 
@@ -338,11 +340,11 @@ pub const AnsiBackend = struct {
         if (options.use_push_pop) {
             var buf: [32]u8 = undefined;
             const seq = std.fmt.bufPrint(&buf, "\x1b[>{d}u", .{flags_to_set}) catch return Error.IOError;
-            self.stdout.writeAll(seq) catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, seq) catch return Error.IOError;
         } else {
             var buf: [48]u8 = undefined;
             const seq = std.fmt.bufPrint(&buf, "\x1b[={d};1u", .{flags_to_set}) catch return Error.IOError;
-            self.stdout.writeAll(seq) catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, seq) catch return Error.IOError;
         }
 
         self.keyboard_flags = flags_to_set;
@@ -356,16 +358,16 @@ pub const AnsiBackend = struct {
 
         // Flush any pending render data before sending the protocol sequence.
         if (self.write_buffer.items.len > 0) {
-            self.stdout.writeAll(self.write_buffer.items) catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, self.write_buffer.items) catch return Error.IOError;
             self.write_buffer.clearRetainingCapacity();
         }
 
         if (self.keyboard_push_pop) {
-            self.stdout.writeAll("\x1b[<u") catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, "\x1b[<u") catch return Error.IOError;
         } else if (self.keyboard_flags != 0) {
             var buf: [48]u8 = undefined;
             const seq = std.fmt.bufPrint(&buf, "\x1b[={d};3u", .{self.keyboard_flags}) catch return Error.IOError;
-            self.stdout.writeAll(seq) catch return Error.IOError;
+            self.stdout.writeStreamingAll(self.io, seq) catch return Error.IOError;
         }
 
         self.keyboard_enabled = false;
@@ -375,22 +377,22 @@ pub const AnsiBackend = struct {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (self.mouse_enabled) return;
         // Enable X10 mouse reporting + SGR extended coordinates + any-event tracking
-        self.stdout.writeAll("\x1b[?1000h\x1b[?1003h\x1b[?1006h") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[?1000h\x1b[?1003h\x1b[?1006h") catch return Error.IOError;
         self.mouse_enabled = true;
     }
 
     fn disableMouse(ptr: *anyopaque) Error!void {
         const self: *AnsiBackend = @ptrCast(@alignCast(ptr));
         if (!self.mouse_enabled) return;
-        self.stdout.writeAll("\x1b[?1006l\x1b[?1003l\x1b[?1000l") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[?1006l\x1b[?1003l\x1b[?1000l") catch return Error.IOError;
         self.mouse_enabled = false;
     }
 
     fn detectKittyKeyboard(self: *AnsiBackend, timeout_ms: u32) Error!bool {
         if (!is_posix) return false;
 
-        self.stdout.writeAll("\x1b[?u") catch return Error.IOError;
-        self.stdout.writeAll("\x1b[c") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[?u") catch return Error.IOError;
+        self.stdout.writeStreamingAll(self.io, "\x1b[c") catch return Error.IOError;
 
         var buffer: std.ArrayListUnmanaged(u8) = .empty;
         defer buffer.deinit(self.allocator);
@@ -418,7 +420,7 @@ pub const AnsiBackend = struct {
             if (fds[0].revents & posix.POLL.IN == 0) break;
 
             var temp: [128]u8 = undefined;
-            const n = self.stdin.read(&temp) catch |err| {
+            const n = self.stdin.readStreaming(self.io, &temp) catch |err| {
                 if (err == error.WouldBlock) break;
                 return Error.IOError;
             };
