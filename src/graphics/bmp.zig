@@ -103,18 +103,12 @@ pub fn decode(allocator: Allocator, file_data: []const u8) !BmpImage {
     };
 }
 
-pub fn loadFile(allocator: Allocator, path: []const u8) !BmpImage {
-    const file = try std.fs.cwd().openFile(path, .{});
-    defer file.close();
+/// Upper bound on the size of a BMP that will be loaded from disk (64 MiB).
+const max_file_size: std.Io.Limit = .limited(64 * 1024 * 1024);
 
-    const stat = try file.stat();
-    const file_data = try allocator.alloc(u8, stat.size);
+pub fn loadFile(allocator: Allocator, io: std.Io, path: []const u8) !BmpImage {
+    const file_data = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, max_file_size);
     defer allocator.free(file_data);
-
-    const bytes_read = try file.readAll(file_data);
-    if (bytes_read != stat.size) {
-        return BmpError.FileTooSmall;
-    }
 
     return decode(allocator, file_data);
 }

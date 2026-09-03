@@ -278,9 +278,10 @@ pub const AnsiBackend = struct {
 
             // Read available bytes
             var buf: [64]u8 = undefined;
-            const n = self.stdin.readStreaming(self.io, &buf) catch |err| {
-                if (err == error.WouldBlock) return events.Event.none;
-                return Error.IOError;
+            var vecs: [1][]u8 = .{&buf};
+            const n = self.stdin.readStreaming(self.io, &vecs) catch |err| switch (err) {
+                error.WouldBlock, error.EndOfStream => return events.Event.none,
+                else => return Error.IOError,
             };
 
             if (n == 0) return events.Event.none;
@@ -397,12 +398,19 @@ pub const AnsiBackend = struct {
         var buffer: std.ArrayListUnmanaged(u8) = .empty;
         defer buffer.deinit(self.allocator);
 
-        const deadline = std.time.milliTimestamp() + @as(i64, timeout_ms);
+        // Monotonic deadline; `awake` is unaffected by wall-clock jumps.
+        const clock: std.Io.Clock = .awake;
+        const deadline = clock.now(self.io).addDuration(.fromMilliseconds(timeout_ms));
         var supported = false;
 
-        while (std.time.milliTimestamp() < deadline) {
-            const now = std.time.milliTimestamp();
-            const remaining_ms: u32 = if (deadline > now) @intCast(deadline - now) else 0;
+        while (true) {
+            const remaining_ns = clock.now(self.io).durationTo(deadline).nanoseconds;
+            if (remaining_ns <= 0) break;
+            // Round up so a sub-millisecond remainder does not busy-spin poll().
+            const remaining_ms: u32 = @intCast(@min(
+                @divTrunc(remaining_ns + std.time.ns_per_ms - 1, std.time.ns_per_ms),
+                @as(i96, timeout_ms),
+            ));
 
             var fds = [_]posix.pollfd{
                 .{
@@ -420,9 +428,10 @@ pub const AnsiBackend = struct {
             if (fds[0].revents & posix.POLL.IN == 0) break;
 
             var temp: [128]u8 = undefined;
-            const n = self.stdin.readStreaming(self.io, &temp) catch |err| {
-                if (err == error.WouldBlock) break;
-                return Error.IOError;
+            var vecs: [1][]u8 = .{&temp};
+            const n = self.stdin.readStreaming(self.io, &vecs) catch |err| switch (err) {
+                error.WouldBlock, error.EndOfStream => break,
+                else => return Error.IOError,
             };
             if (n == 0) break;
 

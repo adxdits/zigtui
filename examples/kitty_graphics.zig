@@ -78,7 +78,7 @@ pub fn main(init: std.process.Init) !void {
     defer state.deinit(allocator);
 
     // Try to load demo.bmp - works for both Kitty and fallback mode
-    state.test_image = loadDemoImage(allocator) catch blk: {
+    state.test_image = loadDemoImage(allocator, init.io) catch blk: {
         // Fall back to gradient if no demo.bmp found
         break :blk try generateGradientImage(allocator, 128, 128);
     };
@@ -268,7 +268,7 @@ fn generateGradientImage(allocator: std.mem.Allocator, width: u32, height: u32) 
     };
 }
 
-fn loadDemoImage(allocator: std.mem.Allocator) !Image {
+fn loadDemoImage(allocator: std.mem.Allocator, io: std.Io) !Image {
     // Try to find demo.bmp relative to executable or in examples folder
     const paths = [_][]const u8{
         "examples/demo.bmp",
@@ -278,7 +278,7 @@ fn loadDemoImage(allocator: std.mem.Allocator) !Image {
 
     for (paths) |path| {
         // Use the BMP decoder
-        const bmp_image = tui.graphics.bmp.loadFile(allocator, path) catch continue;
+        const bmp_image = tui.graphics.bmp.loadFile(allocator, io, path) catch continue;
 
         // Transfer ownership - the Image will own this data
         return Image{

@@ -22,13 +22,15 @@ pub const GraphicsMode = enum {
 
 pub const Graphics = struct {
     allocator: Allocator,
+    environ: *const std.process.Environ.Map,
     mode: GraphicsMode,
     kitty_gfx: ?KittyGraphics,
     detected: bool = false,
 
-    pub fn init(allocator: Allocator) Graphics {
+    pub fn init(allocator: Allocator, environ: *const std.process.Environ.Map) Graphics {
         return .{
             .allocator = allocator,
+            .environ = environ,
             .mode = .block, // Safe default
             .kitty_gfx = null,
         };
@@ -58,19 +60,15 @@ pub const Graphics = struct {
     }
 
     fn detectFromEnv(self: *Graphics) ?GraphicsMode {
-        _ = self;
-
         // Check TERM for kitty
-        if (std.process.getEnvVarOwned(std.heap.page_allocator, "TERM")) |term| {
-            defer std.heap.page_allocator.free(term);
+        if (self.environ.get("TERM")) |term| {
             if (std.mem.indexOf(u8, term, "kitty") != null) {
                 return .kitty;
             }
-        } else |_| {}
+        }
 
         // Check TERM_PROGRAM
-        if (std.process.getEnvVarOwned(std.heap.page_allocator, "TERM_PROGRAM")) |term_program| {
-            defer std.heap.page_allocator.free(term_program);
+        if (self.environ.get("TERM_PROGRAM")) |term_program| {
             if (std.mem.eql(u8, term_program, "kitty")) {
                 return .kitty;
             }
@@ -78,17 +76,17 @@ pub const Graphics = struct {
             if (std.mem.eql(u8, term_program, "WezTerm")) {
                 return .kitty;
             }
-        } else |_| {}
+        }
 
         // Check KITTY_WINDOW_ID (definitive kitty indicator)
-        if (std.process.getEnvVarOwned(std.heap.page_allocator, "KITTY_WINDOW_ID")) |_| {
+        if (self.environ.contains("KITTY_WINDOW_ID")) {
             return .kitty;
-        } else |_| {}
+        }
 
         // Check for Konsole (supports Sixel)
-        if (std.process.getEnvVarOwned(std.heap.page_allocator, "KONSOLE_VERSION")) |_| {
+        if (self.environ.contains("KONSOLE_VERSION")) {
             return .sixel;
-        } else |_| {}
+        }
 
         return null;
     }
@@ -225,7 +223,9 @@ pub const ImageWidget = @import("../widgets/image.zig").ImageWidget;
 
 test "graphics mode detection from env" {
     const allocator = std.testing.allocator;
-    var gfx = Graphics.init(allocator);
+    var environ = std.process.Environ.Map.init(allocator);
+    defer environ.deinit();
+    var gfx = Graphics.init(allocator, &environ);
     defer gfx.deinit();
 
     // Default mode should be block (safe fallback)
@@ -234,7 +234,9 @@ test "graphics mode detection from env" {
 
 test "force graphics mode" {
     const allocator = std.testing.allocator;
-    var gfx = Graphics.init(allocator);
+    var environ = std.process.Environ.Map.init(allocator);
+    defer environ.deinit();
+    var gfx = Graphics.init(allocator, &environ);
     defer gfx.deinit();
 
     gfx.setMode(.kitty);
@@ -244,7 +246,9 @@ test "force graphics mode" {
 
 test "render image to buffer fallback" {
     const allocator = std.testing.allocator;
-    var gfx = Graphics.init(allocator);
+    var environ = std.process.Environ.Map.init(allocator);
+    defer environ.deinit();
+    var gfx = Graphics.init(allocator, &environ);
     defer gfx.deinit();
 
     // Create a small test image (2x2 RGBA)

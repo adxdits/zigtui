@@ -10,11 +10,12 @@ ZigTUI can display BMP images in terminals that support the [Kitty Graphics Prot
 ## Usage
 
 ```zig
-var gfx = tui.Graphics.init(allocator);
+// `init` is the `std.process.Init` passed to `main`.
+var gfx = tui.Graphics.init(allocator, init.environ_map);
 defer gfx.deinit();
 
 // Load a BMP file
-var bmp = try tui.graphics.bmp.loadFile(allocator, "image.bmp");
+var bmp = try tui.graphics.bmp.loadFile(allocator, init.io, "image.bmp");
 defer bmp.deinit(allocator);
 
 const image = tui.Image{
