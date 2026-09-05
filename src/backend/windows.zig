@@ -9,17 +9,53 @@ const Allocator = std.mem.Allocator;
 
 const is_windows = builtin.os.tag == .windows;
 
-// Import Windows API types from std.os.windows
 const windows = if (is_windows) std.os.windows else void;
-const kernel32 = if (is_windows) std.os.windows.kernel32 else void;
 const HANDLE = if (is_windows) windows.HANDLE else void;
 const DWORD = if (is_windows) windows.DWORD else u32;
 const WORD = if (is_windows) windows.WORD else u16;
 const BOOL = if (is_windows) windows.BOOL else i32;
 const UINT = if (is_windows) windows.UINT else u32;
+const SHORT = if (is_windows) windows.SHORT else i16;
 const COORD = if (is_windows) windows.COORD else void;
-const SMALL_RECT = if (is_windows) windows.SMALL_RECT else void;
-const CONSOLE_SCREEN_BUFFER_INFO = if (is_windows) windows.CONSOLE_SCREEN_BUFFER_INFO else void;
+
+const SMALL_RECT = extern struct {
+    Left: SHORT,
+    Top: SHORT,
+    Right: SHORT,
+    Bottom: SHORT,
+};
+
+const CONSOLE_SCREEN_BUFFER_INFO = extern struct {
+    dwSize: COORD,
+    dwCursorPosition: COORD,
+    wAttributes: WORD,
+    srWindow: SMALL_RECT,
+    dwMaximumWindowSize: COORD,
+};
+
+extern "kernel32" fn GetStdHandle(nStdHandle: DWORD) callconv(.winapi) HANDLE;
+extern "kernel32" fn GetConsoleMode(hConsoleHandle: HANDLE, lpMode: *DWORD) callconv(.winapi) BOOL;
+extern "kernel32" fn SetConsoleMode(hConsoleHandle: HANDLE, dwMode: DWORD) callconv(.winapi) BOOL;
+extern "kernel32" fn GetConsoleScreenBufferInfo(
+    hConsoleOutput: HANDLE,
+    lpConsoleScreenBufferInfo: *CONSOLE_SCREEN_BUFFER_INFO,
+) callconv(.winapi) BOOL;
+extern "kernel32" fn SetConsoleCursorPosition(hConsoleOutput: HANDLE, dwCursorPosition: COORD) callconv(.winapi) BOOL;
+extern "kernel32" fn SetConsoleTextAttribute(hConsoleOutput: HANDLE, wAttributes: WORD) callconv(.winapi) BOOL;
+extern "kernel32" fn FillConsoleOutputCharacterW(
+    hConsoleOutput: HANDLE,
+    cCharacter: u16,
+    nLength: DWORD,
+    dwWriteCoord: COORD,
+    lpNumberOfCharsWritten: *DWORD,
+) callconv(.winapi) BOOL;
+extern "kernel32" fn FillConsoleOutputAttribute(
+    hConsoleOutput: HANDLE,
+    wAttribute: WORD,
+    nLength: DWORD,
+    dwWriteCoord: COORD,
+    lpNumberOfAttrsWritten: *DWORD,
+) callconv(.winapi) BOOL;
 
 // Console input/output mode flags
 const ENABLE_ECHO_INPUT: DWORD = 0x0004;
@@ -184,7 +220,10 @@ pub const WindowsBackend = struct {
     original_console_info: CONSOLE_SCREEN_BUFFER_INFO = undefined,
     original_codepage: UINT = undefined,
 
-    pub fn init(allocator: Allocator) !WindowsBackend {
+    /// `io` is accepted to match the ANSI backend's signature; console output
+    /// goes through WriteConsoleW rather than the Io interface.
+    pub fn init(allocator: Allocator, io: std.Io) !WindowsBackend {
+        _ = io;
         if (!is_windows) {
             return error.UnsupportedTerminal; // Use ansi.zig backend instead
         }
@@ -196,18 +235,21 @@ pub const WindowsBackend = struct {
         }
 
         // Get standard handles using GetStdHandle
-        const stdin_handle = windows.GetStdHandle(STD_INPUT_HANDLE) catch return error.IOError;
-        const stdout_handle = windows.GetStdHandle(STD_OUTPUT_HANDLE) catch return error.IOError;
+        const stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
+        const stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdin_handle == windows.INVALID_HANDLE_VALUE or stdout_handle == windows.INVALID_HANDLE_VALUE) {
+            return error.IOError;
+        }
 
         // Get original console modes
         var original_stdin_mode: DWORD = 0;
         var original_stdout_mode: DWORD = 0;
-        _ = kernel32.GetConsoleMode(stdin_handle, &original_stdin_mode);
-        _ = kernel32.GetConsoleMode(stdout_handle, &original_stdout_mode);
+        _ = GetConsoleMode(stdin_handle, &original_stdin_mode);
+        _ = GetConsoleMode(stdout_handle, &original_stdout_mode);
 
         // Get original console info
         var original_console_info: CONSOLE_SCREEN_BUFFER_INFO = undefined;
-        _ = kernel32.GetConsoleScreenBufferInfo(stdout_handle, &original_console_info);
+        _ = GetConsoleScreenBufferInfo(stdout_handle, &original_console_info);
 
         return WindowsBackend{
             .allocator = allocator,
@@ -229,8 +271,8 @@ pub const WindowsBackend = struct {
         }
 
         // Restore original console settings
-        _ = kernel32.SetConsoleTextAttribute(self.stdout_handle, self.original_console_info.wAttributes);
-        _ = kernel32.SetConsoleCursorPosition(self.stdout_handle, self.original_console_info.dwCursorPosition);
+        _ = SetConsoleTextAttribute(self.stdout_handle, self.original_console_info.wAttributes);
+        _ = SetConsoleCursorPosition(self.stdout_handle, self.original_console_info.dwCursorPosition);
 
         // Restore original codepage
         if (self.original_codepage > 0 and self.original_codepage != UTF8_CODE_PAGE) {
@@ -281,12 +323,12 @@ pub const WindowsBackend = struct {
         // When enabled, Windows translates special keys (arrows, Tab, etc.) into
         // ANSI escape sequences instead of providing virtual key codes directly.
         // We want raw virtual key codes so we can handle them in pollEvent.
-        _ = kernel32.SetConsoleMode(self.stdin_handle, stdin_mode);
+        _ = SetConsoleMode(self.stdin_handle, stdin_mode);
 
         // Enable virtual terminal processing for stdout (ANSI escape sequences)
         var stdout_mode: DWORD = self.original_stdout_mode;
         stdout_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        _ = kernel32.SetConsoleMode(self.stdout_handle, stdout_mode);
+        _ = SetConsoleMode(self.stdout_handle, stdout_mode);
 
         self.in_raw_mode = true;
     }
@@ -298,8 +340,8 @@ pub const WindowsBackend = struct {
         if (!is_windows) return;
 
         // Restore original modes
-        _ = kernel32.SetConsoleMode(self.stdin_handle, self.original_stdin_mode);
-        _ = kernel32.SetConsoleMode(self.stdout_handle, self.original_stdout_mode);
+        _ = SetConsoleMode(self.stdin_handle, self.original_stdin_mode);
+        _ = SetConsoleMode(self.stdout_handle, self.original_stdout_mode);
         self.in_raw_mode = false;
     }
 
@@ -332,7 +374,7 @@ pub const WindowsBackend = struct {
         if (!is_windows) return;
 
         var info: CONSOLE_SCREEN_BUFFER_INFO = undefined;
-        if (kernel32.GetConsoleScreenBufferInfo(self.stdout_handle, &info) == 0) {
+        if (!GetConsoleScreenBufferInfo(self.stdout_handle, &info).toBool()) {
             return Error.IOError;
         }
 
@@ -342,13 +384,13 @@ pub const WindowsBackend = struct {
 
         var written: DWORD = undefined;
         // Use wide character version
-        if (kernel32.FillConsoleOutputCharacterW(self.stdout_handle, ' ', buffer_size, coord, &written) == 0) {
+        if (!FillConsoleOutputCharacterW(self.stdout_handle, ' ', buffer_size, coord, &written).toBool()) {
             return Error.IOError;
         }
-        if (kernel32.FillConsoleOutputAttribute(self.stdout_handle, attrs, buffer_size, coord, &written) == 0) {
+        if (!FillConsoleOutputAttribute(self.stdout_handle, attrs, buffer_size, coord, &written).toBool()) {
             return Error.IOError;
         }
-        if (kernel32.SetConsoleCursorPosition(self.stdout_handle, coord) == 0) {
+        if (!SetConsoleCursorPosition(self.stdout_handle, coord).toBool()) {
             return Error.IOError;
         }
     }
@@ -381,7 +423,7 @@ pub const WindowsBackend = struct {
             null,
         );
 
-        if (result == 0) {
+        if (!result.toBool()) {
             return Error.IOError;
         }
     }
@@ -394,7 +436,7 @@ pub const WindowsBackend = struct {
         }
 
         var info: CONSOLE_SCREEN_BUFFER_INFO = undefined;
-        if (kernel32.GetConsoleScreenBufferInfo(self.stdout_handle, &info) == 0) {
+        if (!GetConsoleScreenBufferInfo(self.stdout_handle, &info).toBool()) {
             return .{ .width = 80, .height = 24 }; // Default fallback
         }
 
@@ -426,7 +468,7 @@ pub const WindowsBackend = struct {
 
         // Check if there are events available
         var num_events: DWORD = 0;
-        if (GetNumberOfConsoleInputEvents(self.stdin_handle, &num_events) == 0) {
+        if (!GetNumberOfConsoleInputEvents(self.stdin_handle, &num_events).toBool()) {
             return events.Event.none;
         }
         if (num_events == 0) {
@@ -436,7 +478,7 @@ pub const WindowsBackend = struct {
         // Read the input event
         var input_record: [1]INPUT_RECORD = undefined;
         var events_read: DWORD = 0;
-        if (ReadConsoleInputW(self.stdin_handle, &input_record, 1, &events_read) == 0) {
+        if (!ReadConsoleInputW(self.stdin_handle, &input_record, 1, &events_read).toBool()) {
             return events.Event.none;
         }
         if (events_read == 0) {
@@ -448,7 +490,7 @@ pub const WindowsBackend = struct {
         switch (record.EventType) {
             KEY_EVENT => {
                 const key_event = record.Event.KeyEvent;
-                if (key_event.bKeyDown == 0) {
+                if (!key_event.bKeyDown.toBool()) {
                     return events.Event.none; // Ignore key up events
                 }
 
@@ -536,7 +578,7 @@ pub const WindowsBackend = struct {
             },
             FOCUS_EVENT => {
                 const focus_event = record.Event.FocusEvent;
-                if (focus_event.bSetFocus != 0) {
+                if (focus_event.bSetFocus.toBool()) {
                     return events.Event.focus_gained;
                 } else {
                     return events.Event.focus_lost;
@@ -552,12 +594,12 @@ pub const WindowsBackend = struct {
         if (!is_windows) return;
 
         var info: CONSOLE_CURSOR_INFO = undefined;
-        if (GetConsoleCursorInfo(self.stdout_handle, &info) == 0) {
+        if (!GetConsoleCursorInfo(self.stdout_handle, &info).toBool()) {
             return Error.IOError;
         }
 
-        info.bVisible = 0; // false
-        if (SetConsoleCursorInfo(self.stdout_handle, &info) == 0) {
+        info.bVisible = .FALSE;
+        if (!SetConsoleCursorInfo(self.stdout_handle, &info).toBool()) {
             return Error.IOError;
         }
     }
@@ -568,12 +610,12 @@ pub const WindowsBackend = struct {
         if (!is_windows) return;
 
         var info: CONSOLE_CURSOR_INFO = undefined;
-        if (GetConsoleCursorInfo(self.stdout_handle, &info) == 0) {
+        if (!GetConsoleCursorInfo(self.stdout_handle, &info).toBool()) {
             return Error.IOError;
         }
 
-        info.bVisible = 1; // true
-        if (SetConsoleCursorInfo(self.stdout_handle, &info) == 0) {
+        info.bVisible = .TRUE;
+        if (!SetConsoleCursorInfo(self.stdout_handle, &info).toBool()) {
             return Error.IOError;
         }
     }
@@ -584,7 +626,7 @@ pub const WindowsBackend = struct {
         if (!is_windows) return;
 
         const coord: COORD = .{ .X = @intCast(x), .Y = @intCast(y) };
-        if (kernel32.SetConsoleCursorPosition(self.stdout_handle, coord) == 0) {
+        if (!SetConsoleCursorPosition(self.stdout_handle, coord).toBool()) {
             return Error.IOError;
         }
     }
@@ -605,9 +647,9 @@ pub const WindowsBackend = struct {
         if (self.mouse_enabled) return;
         if (!is_windows) return;
         var mode: DWORD = 0;
-        _ = kernel32.GetConsoleMode(self.stdin_handle, &mode);
+        _ = GetConsoleMode(self.stdin_handle, &mode);
         mode |= ENABLE_MOUSE_INPUT;
-        _ = kernel32.SetConsoleMode(self.stdin_handle, mode);
+        _ = SetConsoleMode(self.stdin_handle, mode);
         self.mouse_enabled = true;
     }
 
@@ -616,9 +658,9 @@ pub const WindowsBackend = struct {
         if (!self.mouse_enabled) return;
         if (!is_windows) return;
         var mode: DWORD = 0;
-        _ = kernel32.GetConsoleMode(self.stdin_handle, &mode);
+        _ = GetConsoleMode(self.stdin_handle, &mode);
         mode &= ~ENABLE_MOUSE_INPUT;
-        _ = kernel32.SetConsoleMode(self.stdin_handle, mode);
+        _ = SetConsoleMode(self.stdin_handle, mode);
         self.mouse_enabled = false;
     }
 };
