@@ -6,6 +6,7 @@ const Error = @import("mod.zig").Error;
 const events = @import("../events/mod.zig");
 const render = @import("../render/mod.zig");
 const ansi_input = @import("ansi_input.zig");
+const restore = @import("../terminal/restore.zig");
 const Allocator = std.mem.Allocator;
 
 const is_windows = builtin.os.tag == .windows;
@@ -39,8 +40,7 @@ pub const AnsiBackend = struct {
     keyboard_push_pop: bool = false,
     keyboard_enabled: bool = false,
     mouse_enabled: bool = false,
-    //swigwinch handler state
-    // original_sigaction: if (is_posix) posix.Sigaction else void = undefined,
+    // SIGWINCH handler state
     original_sigaction: if (is_posix) posix.Sigaction else void = if (is_posix) std.mem.zeroes(posix.Sigaction) else {},
     sigwinch_installed: bool = false,
 
@@ -138,7 +138,10 @@ pub const AnsiBackend = struct {
             raw.cc[@intFromEnum(posix.V.MIN)] = 0;
 
             posix.tcsetattr(self.stdin.handle, .FLUSH, raw) catch return Error.IOError;
-            //for term resize
+
+            restore.arm(self.stdin.handle, self.stdout.handle, self.original_termios);
+            restore.installSignalHandlers();
+
             if (!self.sigwinch_installed) {
                 const new_action = posix.Sigaction{
                     .handler = .{ .handler = handleSigwinch },
@@ -157,6 +160,7 @@ pub const AnsiBackend = struct {
         if (!self.in_raw_mode) return;
 
         if (is_posix) {
+            restore.disarm();
             posix.tcsetattr(self.stdin.handle, .FLUSH, self.original_termios) catch return Error.IOError;
 
             if (self.sigwinch_installed) {
