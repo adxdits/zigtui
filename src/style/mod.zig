@@ -50,6 +50,31 @@ pub const Color = union(enum) {
         };
     }
 
+    /// SGR parameter for this color as a foreground; add 10 for the background
+    /// form. Null for `rgb` and `indexed`, which take extra parameters.
+    pub fn ansiBase(self: Color) ?u8 {
+        return switch (self) {
+            .reset => 39,
+            .black => 30,
+            .red => 31,
+            .green => 32,
+            .yellow => 33,
+            .blue => 34,
+            .magenta => 35,
+            .cyan => 36,
+            .white => 37,
+            .gray, .dark_gray => 90,
+            .light_red => 91,
+            .light_green => 92,
+            .light_yellow => 93,
+            .light_blue => 94,
+            .light_magenta => 95,
+            .light_cyan => 96,
+            .light_white => 97,
+            .rgb, .indexed => null,
+        };
+    }
+
     pub fn toFg(self: Color) []const u8 {
         return switch (self) {
             .reset => "\x1b[39m",
@@ -145,6 +170,18 @@ pub const Modifier = packed struct {
 
     pub fn isEmpty(self: Modifier) bool {
         return @as(u9, @bitCast(self)) == 0;
+    }
+
+    /// SGR parameters for the set flags, in ascending order.
+    pub fn ansiParams(self: Modifier, out: *[9]u8) []const u8 {
+        var n: usize = 0;
+        inline for (@typeInfo(Modifier).@"struct".fields, 1..) |field, code| {
+            if (@field(self, field.name)) {
+                out[n] = code;
+                n += 1;
+            }
+        }
+        return out[0..n];
     }
 
     pub fn toAnsi(self: Modifier, writer: anytype) !void {
