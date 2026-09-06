@@ -2,7 +2,7 @@
 
 A TUI library for Zig, inspired by [Ratatui](https://github.com/ratatui/ratatui). Works on Windows, Linux, and macOS.
 
-![ZigTUI Dashboard](dashboard.gif)
+https://github.com/user-attachments/assets/38e06b92-b664-4b3d-b9ec-1c24ce596a91
 
 ## Documentation
 
