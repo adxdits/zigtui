@@ -2,8 +2,8 @@
 ///
 /// Controls:
 ///   Tab / Shift+Tab  → cycle through demo tabs
-///   Arrow keys       → navigate lists, tree, bar chart
-///   Enter            → toggle tree node / confirm dialog
+///   Arrow keys       → navigate interactive widgets
+///   Space / Enter    → activate the focused control
 ///   t                → cycle Spinner kind
 ///   q / Esc          → quit
 const std = @import("std");
@@ -24,6 +24,9 @@ const BarChart = tui.widgets.BarChart;
 const Bar = tui.widgets.Bar;
 const BarDirection = tui.widgets.BarDirection;
 const TextInput = tui.widgets.TextInput;
+const Checkbox = tui.widgets.Checkbox;
+const RadioItem = tui.widgets.RadioItem;
+const RadioGroup = tui.widgets.RadioGroup;
 const Spinner = tui.widgets.Spinner;
 const SpinnerKind = tui.widgets.SpinnerKind;
 const Tree = tui.widgets.Tree;
@@ -41,6 +44,7 @@ const Tab = enum(u8) {
     sparkline = 0,
     bar_chart,
     text_input,
+    choice_controls,
     spinner,
     tree,
     canvas,
@@ -51,10 +55,22 @@ const tab_titles = [_][]const u8{
     "Sparkline",
     "BarChart",
     "TextInput",
+    "Choices",
     "Spinner",
     "Tree",
     "Canvas",
     "Popup",
+};
+
+const ChoiceFocus = enum {
+    checkbox,
+    radio,
+};
+
+const size_options = [_]RadioItem{
+    .{ .label = "Compact" },
+    .{ .label = "Comfortable" },
+    .{ .label = "Spacious" },
 };
 
 const AppState = struct {
@@ -76,6 +92,23 @@ const AppState = struct {
         .cursor_style = .{ .fg = .black, .bg = .white },
         .placeholder = "Type something…",
         .focused = true,
+    },
+
+    // Choice controls
+    choice_focus: ChoiceFocus = .checkbox,
+    checkbox_area: Rect = .{},
+    radio_area: Rect = .{},
+    checkbox: Checkbox = .{
+        .label = "Enable desktop notifications",
+        .focused = true,
+        .checked_style = .{ .fg = .green, .modifier = .{ .bold = true } },
+        .focused_style = .{ .bg = .dark_gray },
+    },
+    radio: RadioGroup = .{
+        .items = &size_options,
+        .selected = 1,
+        .selected_style = .{ .fg = .cyan, .modifier = .{ .bold = true } },
+        .focused_style = .{ .bg = .dark_gray },
     },
 
     // Spinner
@@ -144,6 +177,19 @@ const AppState = struct {
             self.spark_data[self.spark_head] = 50.0 + 40.0 * @sin(fi * 0.12) + 10.0 * @sin(fi * 0.5);
             self.spark_head = (self.spark_head + 1) % self.spark_data.len;
         }
+    }
+
+    fn setChoiceFocus(self: *AppState, focus: ChoiceFocus) void {
+        self.choice_focus = focus;
+        self.checkbox.focused = focus == .checkbox;
+        self.radio.focused = focus == .radio;
+    }
+
+    fn handleChoiceKey(self: *AppState, key: tui.KeyEvent) void {
+        _ = switch (self.choice_focus) {
+            .checkbox => self.checkbox.handleKey(key),
+            .radio => self.radio.handleKey(key),
+        };
     }
 
     fn currentTree(self: *AppState) Tree {
@@ -221,6 +267,8 @@ pub fn main(init: std.process.Init) !void {
                             else => {
                                 if (state.tab == .text_input) {
                                     state.input.insertCodepoint(c);
+                                } else if (state.tab == .choice_controls) {
+                                    state.handleChoiceKey(key);
                                 }
                             },
                         },
@@ -240,10 +288,18 @@ pub fn main(init: std.process.Init) !void {
                             if (state.tab == .text_input) state.input.deleteForward();
                         },
                         .left => {
-                            if (state.tab == .text_input) state.input.moveCursorLeft();
+                            if (state.tab == .text_input) {
+                                state.input.moveCursorLeft();
+                            } else if (state.tab == .choice_controls and state.choice_focus == .radio) {
+                                state.handleChoiceKey(key);
+                            }
                         },
                         .right => {
-                            if (state.tab == .text_input) state.input.moveCursorRight();
+                            if (state.tab == .text_input) {
+                                state.input.moveCursorRight();
+                            } else if (state.tab == .choice_controls and state.choice_focus == .radio) {
+                                state.handleChoiceKey(key);
+                            }
                         },
                         .home => {
                             if (state.tab == .text_input) state.input.moveCursorHome();
@@ -261,6 +317,7 @@ pub fn main(init: std.process.Init) !void {
                                 .bar_chart => {
                                     if (state.bar_selected > 0) state.bar_selected -= 1;
                                 },
+                                .choice_controls => state.setChoiceFocus(.checkbox),
                                 else => {},
                             }
                         },
@@ -274,6 +331,7 @@ pub fn main(init: std.process.Init) !void {
                                 .bar_chart => {
                                     if (state.bar_selected < 5) state.bar_selected += 1;
                                 },
+                                .choice_controls => state.setChoiceFocus(.radio),
                                 else => {},
                             }
                         },
@@ -281,6 +339,8 @@ pub fn main(init: std.process.Init) !void {
                             if (state.tab == .tree) {
                                 state.tree_nodes[0].expanded = !state.tree_nodes[0].expanded;
                                 state.tree_nodes[1].expanded = !state.tree_nodes[1].expanded;
+                            } else if (state.tab == .choice_controls) {
+                                state.handleChoiceKey(key);
                             }
                         },
                         .esc => state.show_dialog = true,
@@ -290,6 +350,15 @@ pub fn main(init: std.process.Init) !void {
             },
             .resize => |size| {
                 try terminal.resize(.{ .width = size.width, .height = size.height });
+            },
+            .mouse => |mouse| {
+                if (state.tab == .choice_controls) {
+                    if (state.checkbox.handleMouse(mouse, state.checkbox_area)) {
+                        state.setChoiceFocus(.checkbox);
+                    } else if (state.radio.handleMouse(mouse, state.radio_area)) {
+                        state.setChoiceFocus(.radio);
+                    }
+                }
             },
             else => {},
         }
@@ -377,6 +446,7 @@ fn drawContent(state: *AppState, area: Rect, buf: *Buffer) void {
         .sparkline => drawSparklineTab(state, area, buf),
         .bar_chart => drawBarChartTab(state, area, buf),
         .text_input => drawTextInputTab(state, area, buf),
+        .choice_controls => drawChoiceControlsTab(state, area, buf),
         .spinner => drawSpinnerTab(state, area, buf),
         .tree => drawTreeTab(state, area, buf),
         .canvas => drawCanvasTab(area, buf),
@@ -507,6 +577,45 @@ fn drawTextInputTab(state: *AppState, area: Rect, buf: *Buffer) void {
     var echo_buf: [300]u8 = undefined;
     const echo = std.fmt.bufPrint(&echo_buf, "Buffer ({d} bytes): \"{s}\"", .{ state.input.len, state.input.value() }) catch return;
     buf.setString(inner.x, inner.y + 5, echo, .{ .fg = .white });
+}
+
+// ── Choice controls tab ───────────────────────────────────────────────────────
+
+fn drawChoiceControlsTab(state: *AppState, area: Rect, buf: *Buffer) void {
+    const blk = Block{
+        .title = " Choice Controls (Up/Down focus, Left/Right select, Space/Enter activate) ",
+        .borders = Borders.ALL,
+        .border_style = .{ .fg = .gray },
+        .title_style = .{ .fg = .green, .modifier = .{ .bold = true } },
+        .border_symbols = BorderSymbols.rounded(),
+    };
+    blk.render(area, buf);
+
+    const inner = blk.inner(area);
+    state.checkbox_area = .{};
+    state.radio_area = .{};
+    if (inner.width == 0 or inner.height < 2) return;
+
+    buf.setString(inner.x, inner.y, "Notification preference", .{ .fg = .dark_gray });
+    state.checkbox_area = .{ .x = inner.x, .y = inner.y + 1, .width = inner.width, .height = 1 };
+    state.checkbox.render(state.checkbox_area, buf);
+
+    if (inner.height < 4) return;
+    buf.setString(inner.x, inner.y + 3, "Interface density", .{ .fg = .dark_gray });
+    state.radio_area = .{
+        .x = inner.x,
+        .y = inner.y + 4,
+        .width = inner.width,
+        .height = @min(@as(u16, size_options.len), inner.height -| 4),
+    };
+    state.radio.render(state.radio_area, buf);
+
+    if (inner.height < 8) return;
+    const notification = if (state.checkbox.checked) "on" else "off";
+    const density = if (state.radio.selected) |selected| size_options[selected].label else "none";
+    var status_buf: [96]u8 = undefined;
+    const status = std.fmt.bufPrint(&status_buf, "Current value: notifications {s}, density {s}", .{ notification, density }) catch return;
+    buf.setString(inner.x, inner.y + 7, status, .{ .fg = .white });
 }
 
 // ── Spinner tab ───────────────────────────────────────────────────────────────
