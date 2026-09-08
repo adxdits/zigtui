@@ -21,9 +21,9 @@ const features: Feature[] = [
   },
   {
     icon: "",
-    title: "14+ Widgets",
+    title: "16+ Widgets",
     description:
-      "Block, Paragraph, List, Gauge, Table, Tabs, Sparkline, BarChart, TextInput, Spinner, Tree, Canvas, Popup, Dialog all ready to use.",
+      "Now with Checkbox and RadioGroup for keyboard- and mouse-ready forms, alongside tables, charts, text input, dialogs, and more.",
   },
   {
     icon: "",

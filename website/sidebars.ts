@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
         "widgets/sparkline",
         "widgets/bar-chart",
         "widgets/text-input",
+        "widgets/choice-controls",
         "widgets/spinner",
         "widgets/tree",
         "widgets/canvas",
