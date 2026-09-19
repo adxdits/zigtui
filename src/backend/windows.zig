@@ -5,6 +5,7 @@ const KeyboardProtocolOptions = @import("mod.zig").KeyboardProtocolOptions;
 const Error = @import("mod.zig").Error;
 const events = @import("../events/mod.zig");
 const render = @import("../render/mod.zig");
+const restore = @import("../terminal/restore.zig");
 const Allocator = std.mem.Allocator;
 
 const is_windows = builtin.os.tag == .windows;
@@ -330,6 +331,13 @@ pub const WindowsBackend = struct {
         stdout_mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         _ = SetConsoleMode(self.stdout_handle, stdout_mode);
 
+        // Hand the console to `restore` so a panic or abnormal exit cannot
+        // leave it in raw mode with mouse reporting on and the cursor hidden.
+        restore.arm(self.stdin_handle, self.stdout_handle, .{
+            .stdin = self.original_stdin_mode,
+            .stdout = self.original_stdout_mode,
+        });
+
         self.in_raw_mode = true;
     }
 
@@ -338,6 +346,8 @@ pub const WindowsBackend = struct {
         if (!self.in_raw_mode) return;
 
         if (!is_windows) return;
+
+        restore.disarm();
 
         // Restore original modes
         _ = SetConsoleMode(self.stdin_handle, self.original_stdin_mode);
