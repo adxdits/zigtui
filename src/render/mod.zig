@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 pub const codepointWidth = @import("width.zig").codepointWidth;
 pub const stringWidth = @import("width.zig").stringWidth;
 pub const truncateToWidth = @import("width.zig").truncateToWidth;
+const decodeCharAt = @import("width.zig").decodeCharAt;
 
 pub const Cell = struct {
     char: u21 = ' ',
@@ -231,18 +232,21 @@ pub const Buffer = struct {
     }
 
     /// Write `str` starting at (x, y), stopping at `max_width` columns or the
-    /// buffer edge. Returns the number of columns written.
+    /// buffer edge. Returns the number of columns written. Malformed UTF-8 is
+    /// substituted with U+FFFD instead of panicking.
     pub fn putString(self: *Buffer, x: u16, y: u16, str: []const u8, max_width: u16, s: style.Style) u16 {
         if (y >= self.height or x >= self.width) return 0;
 
         var col: u16 = 0;
-        var iter = std.unicode.Utf8View.initUnchecked(str).iterator();
-        while (iter.nextCodepoint()) |codepoint| {
-            const w = codepointWidth(codepoint);
+        var i: usize = 0;
+        while (i < str.len) {
+            const d = decodeCharAt(str, i);
+            i += d.len;
+            const w = codepointWidth(d.cp);
             if (w == 0) continue;
             if (col + w > max_width) break;
             if (x + col + w > self.width) break;
-            self.setChar(x + col, y, codepoint, s);
+            self.setChar(x + col, y, d.cp, s);
             col += w;
         }
         return col;
@@ -423,6 +427,18 @@ test "putString reports columns and respects max width" {
     try std.testing.expectEqual(@as(u16, 5), buf.putString(0, 0, "hello", 10, .{}));
     try std.testing.expectEqual(@as(u16, 4), buf.putString(0, 0, "日本語", 5, .{}));
     try std.testing.expectEqual(@as(u16, 0), buf.putString(0, 0, "日", 1, .{}));
+}
+
+test "putString tolerates malformed UTF-8" {
+    const allocator = std.testing.allocator;
+    var buf = try Buffer.init(allocator, 8, 1);
+    defer buf.deinit();
+
+    const bad = [_]u8{ 'a', 0xFF, 'b' };
+    try std.testing.expectEqual(@as(u16, 3), buf.putString(0, 0, &bad, 8, .{}));
+    try std.testing.expectEqual(@as(u21, 'a'), buf.get(0, 0).?.char);
+    try std.testing.expectEqual(@as(u21, 0xFFFD), buf.get(1, 0).?.char);
+    try std.testing.expectEqual(@as(u21, 'b'), buf.get(2, 0).?.char);
 }
 
 test "truncation leaves room for the ellipsis" {

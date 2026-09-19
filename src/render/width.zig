@@ -275,22 +275,47 @@ pub fn codepointWidth(cp: u21) u2 {
     return 1;
 }
 
+/// One decoded code point and the number of bytes it consumed.
+pub const DecodedChar = struct { cp: u21, len: usize };
+
+/// Decodes the code point starting at `bytes[index]`; `index` must be in
+/// bounds. Malformed input (invalid start byte, truncated or overlong
+/// sequence) yields U+FFFD with `len = 1`, so callers advance a single byte
+/// and never skip past a following valid code point.
+pub fn decodeCharAt(bytes: []const u8, index: usize) DecodedChar {
+    const len = std.unicode.utf8ByteSequenceLength(bytes[index]) catch return .{ .cp = 0xFFFD, .len = 1 };
+    if (index + len > bytes.len) return .{ .cp = 0xFFFD, .len = 1 };
+    const cp = std.unicode.utf8Decode(bytes[index .. index + len]) catch return .{ .cp = 0xFFFD, .len = 1 };
+    return .{ .cp = cp, .len = len };
+}
+
+/// Display width of `bytes` in columns. Malformed UTF-8 counts as the
+/// replacement character (one column), matching how it is rendered.
 pub fn stringWidth(bytes: []const u8) usize {
     var total: usize = 0;
-    var iter = std.unicode.Utf8View.initUnchecked(bytes).iterator();
-    while (iter.nextCodepoint()) |cp| total += codepointWidth(cp);
+    var i: usize = 0;
+    while (i < bytes.len) {
+        const d = decodeCharAt(bytes, i);
+        total += codepointWidth(d.cp);
+        i += d.len;
+    }
     return total;
 }
 
+/// Longest prefix of `bytes` that fits within `max_columns`, without
+/// splitting a code point. Malformed UTF-8 is handled like the replacement
+/// character.
 pub fn truncateToWidth(bytes: []const u8, max_columns: usize) []const u8 {
     var used: usize = 0;
     var end: usize = 0;
-    var iter = std.unicode.Utf8View.initUnchecked(bytes).iterator();
-    while (iter.nextCodepoint()) |cp| {
-        const w = codepointWidth(cp);
+    var i: usize = 0;
+    while (i < bytes.len) {
+        const d = decodeCharAt(bytes, i);
+        const w = codepointWidth(d.cp);
         if (used + w > max_columns) break;
         used += w;
-        end = iter.i;
+        i += d.len;
+        end = i;
     }
     return bytes[0..end];
 }
@@ -323,6 +348,27 @@ test "string width" {
     try std.testing.expectEqual(@as(usize, 5), stringWidth("hello"));
     try std.testing.expectEqual(@as(usize, 8), stringWidth("日本語ab"));
     try std.testing.expectEqual(@as(usize, 1), stringWidth("e\u{0301}"));
+}
+
+test "malformed UTF-8 decodes as U+FFFD" {
+    // Stray invalid byte.
+    const stray = [_]u8{ 'a', 0xFF, 'b' };
+    try std.testing.expectEqual(@as(usize, 3), stringWidth(&stray));
+    try std.testing.expectEqual(@as(usize, 3), truncateToWidth(&stray, 10).len);
+    try std.testing.expectEqual(@as(usize, 1), truncateToWidth(&stray, 1).len);
+
+    // Truncated multi-byte sequence at the end of the input.
+    const truncated = [_]u8{ 0xE4, 0xBD };
+    try std.testing.expectEqual(@as(usize, 2), stringWidth(&truncated));
+
+    // A malformed sequence must not swallow the following valid byte.
+    const bad_prefix = [_]u8{ 0xE4, 0xBD, '.' };
+    try std.testing.expectEqual(@as(usize, 3), stringWidth(&bad_prefix));
+    try std.testing.expectEqualStrings("\xE4\xBD", truncateToWidth(&bad_prefix, 2));
+
+    // Overlong encoding.
+    const overlong = [_]u8{ 0xC0, 0xAF };
+    try std.testing.expectEqual(@as(usize, 2), stringWidth(&overlong));
 }
 
 test "truncate to width never splits a wide codepoint" {
