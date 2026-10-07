@@ -115,6 +115,6 @@ pub fn loadFile(allocator: Allocator, io: std.Io, path: []const u8) !BmpImage {
 
 test "bmp header parsing" {
     // Minimal invalid BMP
-    const invalid = [_]u8{ 'X', 'Y' } ++ [_]u8{0} ** 52;
+    const invalid = [_]u8{ 'X', 'Y' } ++ @as([52]u8, @splat(0));
     try std.testing.expectError(BmpError.InvalidSignature, decode(std.testing.allocator, &invalid));
 }

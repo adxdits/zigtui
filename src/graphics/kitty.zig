@@ -13,7 +13,7 @@ pub const Format = enum(u8) {
     png = 100, // PNG compressed
 
     pub fn toCode(self: Format) u8 {
-        return @intFromEnum(self);
+        return @backingInt(self);
     }
 };
 
@@ -166,7 +166,7 @@ pub const KittyGraphics = struct {
             if (is_first) {
                 try self.output_buffer.append(alloc, 'a');
                 try self.output_buffer.append(alloc, '=');
-                try self.output_buffer.append(alloc, @intFromEnum(params.a));
+                try self.output_buffer.append(alloc, @backingInt(params.a));
 
                 try self.appendParam(",f=", params.f.toCode());
                 try self.appendOptParam(",s=", params.s);

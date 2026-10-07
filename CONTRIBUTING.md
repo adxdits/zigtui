@@ -10,7 +10,7 @@ cd zigtui
 zig build test
 ```
 
-You'll need Zig 0.16.0 or later.
+You'll need Zig 0.17.0 or later.
 
 ## Running the examples
 

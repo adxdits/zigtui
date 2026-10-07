@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const posix = std.posix;
 const windows = std.os.windows;
 
-const is_posix = builtin.os.tag != .windows;
+const is_posix = builtin.target.os.tag != .windows;
 
 /// Written verbatim from signal handlers and from the panic path, so it has to
 /// stay one preformatted constant: no allocation, no formatting, one syscall.

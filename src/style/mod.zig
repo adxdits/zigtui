@@ -175,8 +175,8 @@ pub const Modifier = packed struct {
     /// SGR parameters for the set flags, in ascending order.
     pub fn ansiParams(self: Modifier, out: *[9]u8) []const u8 {
         var n: usize = 0;
-        inline for (@typeInfo(Modifier).@"struct".fields, 1..) |field, code| {
-            if (@field(self, field.name)) {
+        inline for (@typeInfo(Modifier).@"struct".field_names, 1..) |field_name, code| {
+            if (@field(self, field_name)) {
                 out[n] = code;
                 n += 1;
             }
