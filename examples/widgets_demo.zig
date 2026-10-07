@@ -79,7 +79,7 @@ const AppState = struct {
     tick: u64 = 0,
 
     // Sparkline
-    spark_data: [80]f64 = [_]f64{0} ** 80,
+    spark_data: [80]f64 = @splat(0),
     spark_head: usize = 0,
 
     // BarChart
@@ -254,7 +254,7 @@ pub fn main(init: std.process.Init) !void {
                             't', 'T' => {
                                 // Cycle spinner kind
                                 const kinds = [_]SpinnerKind{ .dots, .line, .arrow, .bounce, .bar };
-                                const cur = @intFromEnum(state.spinner.kind);
+                                const cur = @backingInt(state.spinner.kind);
                                 state.spinner.kind = kinds[(cur + 1) % kinds.len];
                                 state.spinner.reset();
                             },
@@ -273,13 +273,13 @@ pub fn main(init: std.process.Init) !void {
                             },
                         },
                         .tab => {
-                            const next = (@intFromEnum(state.tab) + 1) % tab_titles.len;
-                            state.tab = @enumFromInt(next);
+                            const next = (@backingInt(state.tab) + 1) % tab_titles.len;
+                            state.tab = @fromBackingInt(@intCast(next));
                         },
                         .back_tab => {
-                            const cur = @intFromEnum(state.tab);
+                            const cur = @backingInt(state.tab);
                             const prev = if (cur == 0) tab_titles.len - 1 else cur - 1;
-                            state.tab = @enumFromInt(prev);
+                            state.tab = @fromBackingInt(@intCast(prev));
                         },
                         .backspace => {
                             if (state.tab == .text_input) state.input.deleteBackward();
@@ -424,7 +424,7 @@ fn drawFrame(state: *AppState, buf: *Buffer) void {
 fn drawTabs(state: *AppState, area: Rect, buf: *Buffer) void {
     var tabs = Tabs{
         .titles = &tab_titles,
-        .selected = @intFromEnum(state.tab),
+        .selected = @backingInt(state.tab),
         .style = .{ .fg = .dark_gray },
         .selected_style = .{ .fg = .cyan, .modifier = .{ .bold = true, .underlined = true } },
         .unselected_style = .{ .fg = .gray },

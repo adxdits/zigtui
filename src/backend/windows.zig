@@ -8,7 +8,7 @@ const render = @import("../render/mod.zig");
 const restore = @import("../terminal/restore.zig");
 const Allocator = std.mem.Allocator;
 
-const is_windows = builtin.os.tag == .windows;
+const is_windows = builtin.target.os.tag == .windows;
 
 const windows = if (is_windows) std.os.windows else void;
 const HANDLE = if (is_windows) windows.HANDLE else void;

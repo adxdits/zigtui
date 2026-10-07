@@ -9,9 +9,9 @@ const ansi_input = @import("ansi_input.zig");
 const restore = @import("../terminal/restore.zig");
 const Allocator = std.mem.Allocator;
 
-const is_windows = builtin.os.tag == .windows;
-const is_linux = builtin.os.tag == .linux;
-const is_macos = builtin.os.tag == .macos;
+const is_windows = builtin.target.os.tag == .windows;
+const is_linux = builtin.target.os.tag == .linux;
+const is_macos = builtin.target.os.tag == .macos;
 const is_posix = !is_windows;
 
 // POSIX types - only available on non-Windows
@@ -139,8 +139,8 @@ pub const AnsiBackend = struct {
             raw.cflag.CSIZE = .CS8;
 
             // Set read timeout
-            raw.cc[@intFromEnum(posix.V.TIME)] = 0;
-            raw.cc[@intFromEnum(posix.V.MIN)] = 0;
+            raw.cc[@backingInt(posix.V.TIME)] = 0;
+            raw.cc[@backingInt(posix.V.MIN)] = 0;
 
             posix.tcsetattr(self.stdin.handle, .FLUSH, raw) catch return Error.IOError;
 
