@@ -107,6 +107,7 @@ pub const Event = union(enum) {
     resize: struct { width: u16, height: u16 },
     focus_gained,
     focus_lost,
+    /// Backend-owned bytes, valid until the next pollEvent call or backend deinit.
     paste: []const u8,
     none,
 

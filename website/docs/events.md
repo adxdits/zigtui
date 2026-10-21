@@ -51,7 +51,7 @@ fn render(_: void, buf: *tui.Buffer) !void {
 | `.mouse` | A mouse button, movement, or wheel event, once enabled. See [Mouse](#mouse) |
 | `.resize` | The terminal changed size. Call `terminal.resize` so the next frame repaints fully |
 | `.focus_gained`, `.focus_lost` | The terminal window gained or lost focus. Only the Windows backend reports these |
-| `.paste` | Not reported by any backend yet |
+| `.paste` | Pasted bytes, when bracketed paste is enabled on the Linux/macOS backend. See [Bracketed paste](#bracketed-paste) |
 | `.none` | The timeout passed with nothing to report |
 
 `Event` also has the shortcuts `event.isChar('q')`, `event.isKey(.enter)`, and `event.isResize()`.
@@ -135,6 +135,52 @@ With flag `2`, check `key.kind` so a key isn't handled twice:
 ```
 
 Without it, every key event is a `.press`. The Windows backend does not support the protocol and returns `error.UnsupportedTerminal`.
+
+## Bracketed paste
+
+Enable bracketed paste after creating the terminal:
+
+```zig
+terminal.enableBracketedPaste() catch |err| switch (err) {
+    error.UnsupportedTerminal => {}, // Native Windows console input.
+    else => return err,
+};
+defer terminal.disableBracketedPaste() catch {};
+```
+
+This is opt-in and requires raw mode. On terminals supporting bracketed paste,
+each paste arrives as one `.paste` event instead of individual key events:
+
+```zig
+switch (event) {
+    .paste => |bytes| {
+        // Handle or copy the bytes before calling pollEvent again.
+        handlePaste(bytes);
+    },
+    .key => |key| handleKey(key),
+    else => {},
+}
+```
+
+The slice belongs to the backend and is valid until the next `pollEvent` call
+or backend deinitialization. Copy it with your allocator if you need it longer.
+Newlines, control characters, and UTF-8 bytes are preserved verbatim, not
+interpreted as shortcuts. Validate or filter the bytes as appropriate for your
+application, especially when inserting into a single-line text input.
+
+The Linux/macOS backend accepts at most **1 MiB (1,048,576 bytes)** per paste.
+`pollEvent` returns `error.PasteTooLarge` if the payload exceeds that limit.
+Allocation failures return `error.OutOfMemory`. In either case, the backend
+discards the remaining payload through the paste's end marker before processing
+ordinary keys again. No partial paste event is emitted.
+
+Incomplete pastes survive polling timeouts without becoming key events.
+Disabling bracketed paste during a paste also discards through its end marker.
+Normal terminal/backend teardown and panic/signal restoration disable the mode.
+
+The native Windows backend returns `error.UnsupportedTerminal` when enabling
+bracketed paste; disabling it is a no-op. Terminals that do not support the mode
+continue reporting pasted text as ordinary key events.
 
 ## Mouse
 

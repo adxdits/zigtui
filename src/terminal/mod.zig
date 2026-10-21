@@ -54,6 +54,7 @@ pub const Terminal = struct {
     }
 
     pub fn deinit(self: *Terminal) void {
+        self.backend_impl.disableBracketedPaste() catch {};
         if (self.hidden_cursor) {
             self.backend_impl.showCursor() catch {};
         }
@@ -226,6 +227,14 @@ pub const Terminal = struct {
 
     pub fn disableMouse(self: *Terminal) !void {
         try self.backend_impl.disableMouse();
+    }
+
+    pub fn enableBracketedPaste(self: *Terminal) !void {
+        try self.backend_impl.enableBracketedPaste();
+    }
+
+    pub fn disableBracketedPaste(self: *Terminal) !void {
+        try self.backend_impl.disableBracketedPaste();
     }
 
     pub fn getSize(self: *Terminal) !render.Size {

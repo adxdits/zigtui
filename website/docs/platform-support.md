@@ -23,6 +23,13 @@ Mouse events use **SGR mode** (`\x1b[?1006h`) on Unix-like systems and the nativ
 
 See the [Kitty Graphics](./kitty-graphics.md) page for image display support per terminal.
 
+## Bracketed paste
+
+On Linux and macOS, `terminal.enableBracketedPaste()` enables paste events on
+terminals supporting the protocol. The native Windows backend returns
+`error.UnsupportedTerminal`. See [Bracketed paste](./events.md#bracketed-paste)
+for payload lifetime, size limits, and error handling.
+
 ## Requirements
 
 - Zig **0.16.0** or newer  

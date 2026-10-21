@@ -9,6 +9,7 @@ const is_posix = builtin.target.os.tag != .windows;
 /// stay one preformatted constant: no allocation, no formatting, one syscall.
 const leave_sequence =
     "\x1b[?2026l" ++
+    "\x1b[?2004l" ++
     "\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l" ++
     "\x1b[<u" ++
     "\x1b[?7h" ++

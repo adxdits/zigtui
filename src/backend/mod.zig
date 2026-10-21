@@ -8,6 +8,7 @@ pub const Error = error{
     TerminalTooSmall,
     NotInRawMode,
     NotATerminal,
+    PasteTooLarge,
     Unexpected,
     // OS-level write errors (surfaced through std)
     ProcessOrphaned,
@@ -61,6 +62,8 @@ pub const Backend = struct {
         disable_keyboard_protocol: *const fn (ptr: *anyopaque) Error!void,
         enable_mouse: *const fn (ptr: *anyopaque) Error!void,
         disable_mouse: *const fn (ptr: *anyopaque) Error!void,
+        enable_bracketed_paste: ?*const fn (ptr: *anyopaque) Error!void = null,
+        disable_bracketed_paste: ?*const fn (ptr: *anyopaque) Error!void = null,
     };
 
     pub fn enterRawMode(self: Backend) Error!void {
@@ -126,6 +129,15 @@ pub const Backend = struct {
     pub fn disableMouse(self: Backend) Error!void {
         return self.vtable.disable_mouse(self.ptr);
     }
+
+    pub fn enableBracketedPaste(self: Backend) Error!void {
+        const enable = self.vtable.enable_bracketed_paste orelse return Error.UnsupportedTerminal;
+        return enable(self.ptr);
+    }
+
+    pub fn disableBracketedPaste(self: Backend) Error!void {
+        if (self.vtable.disable_bracketed_paste) |disable| try disable(self.ptr);
+    }
 };
 
 // Platform-specific backends
@@ -136,4 +148,11 @@ pub const NativeBackend = if (@import("builtin").os.tag == .windows) WindowsBack
 
 pub fn init(allocator: std.mem.Allocator, io: std.Io) !NativeBackend {
     return NativeBackend.init(allocator, io);
+}
+
+test "native Windows backend explicitly rejects bracketed paste" {
+    var windows_backend: WindowsBackend = undefined;
+    const interface = windows_backend.interface();
+    try std.testing.expectError(Error.UnsupportedTerminal, interface.enableBracketedPaste());
+    try interface.disableBracketedPaste();
 }

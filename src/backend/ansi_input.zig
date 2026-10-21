@@ -3,6 +3,7 @@ const events = @import("../events/mod.zig");
 
 pub const ParseResult = union(enum) {
     complete: Complete,
+    paste_start: usize,
     incomplete,
     invalid: usize,
 };
@@ -166,6 +167,8 @@ fn parseCsiLetter(params: []const u8, final: u8, consumed: usize) ParseResult {
 }
 
 fn parseCsiTilde(params: []const u8, consumed: usize) ParseResult {
+    if (std.mem.eql(u8, params, "200")) return .{ .paste_start = consumed };
+
     const parsed = parseParams(params);
     const mods = decodeModifiers(parsed.modifiers);
 
@@ -503,6 +506,15 @@ test "parse incomplete CSI" {
     const input = "\x1b[1;5";
     const result = parse(input);
     try std.testing.expect(result == .incomplete);
+}
+
+test "parse bracketed paste start leaves payload for the streaming collector" {
+    const result = parse("\x1b[200~hello");
+    try std.testing.expect(result == .paste_start);
+    try std.testing.expectEqual(@as(usize, 6), result.paste_start);
+    try std.testing.expect(parseStale("\x1b[200~") == .paste_start);
+    try std.testing.expect(parse("\x1b[200") == .incomplete);
+    try std.testing.expect(parse("\x1b[200;1~") == .complete);
 }
 
 test "parse SGR mouse left click" {
